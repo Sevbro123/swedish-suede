@@ -1,7 +1,35 @@
 # Phase 0 — Data discovery findings
 
-Status: **documentation-based, not yet verified against live endpoints.**
-Date: 2026-10-18.
+Date: 2026-10-18. Sections 1–3 were written from documentation while the NHL
+hosts were blocked. Network access was then granted and the claims were tested;
+**section V (below) supersedes them wherever they differ.**
+
+## V. Verification results (live, 2026-10-18)
+
+One sample per endpoint, ~1 req/s. Games used: 2023020204 (MIN–BUF, 2023-11-10),
+2010020100, 2008020100; team 10 (TOR); skater 8478483; goalie 8475883.
+
+| Claim | Result |
+|---|---|
+| `api-web` schedule (`/schedule/{date}`, `/club-schedule-season/{team}/{season}`) | **VERIFIED.** Has `id`, `gameType`, `gameDate`, `startTimeUTC`, `venueUTCOffset`, `venueTimezone`, `neutralSite`, `homeTeam/awayTeam.{id,abbrev,score}`, `gameOutcome.lastPeriodType` (REG/OT/SO) |
+| Boxscore | **VERIFIED.** `playerByGameStats.{homeTeam,awayTeam}.{forwards,defense,goalies}`; goalie rows have `starter: bool`, `toi`, `shotsAgainst`, `saves`, strength-split shots/goals against. `starter` present in 2010 too |
+| Play-by-play | **VERIFIED.** `plays[]` with `typeDescKey` (shot-on-goal, missed-shot, blocked-shot, goal, penalty, faceoff, hit, …), `periodDescriptor`, `timeInPeriod`, `situationCode` (4-digit string; on 1551 = 5v5 with both goalies — exact digit order to be confirmed in Phase 1), `homeTeamDefendingSide`, `details.{xCoord,yCoord,zoneCode,shotType,shootingPlayerId,goalieInNetId,eventOwnerTeamId}`; penalties have `typeCode`, `duration`, `committedByPlayerId`, `drawnByPlayerId`. Top level has `startTimeUTC`, `rosterSpots` |
+| Play-by-play history | **2010-11: coordinates present** (67/67 shots had x/y, shot type, goalie). **2008-09: no coordinates** (0/54) and only summary events. → xG usable from **2010-11** on. Coverage by season will be measured during ingestion |
+| Shift charts (`stats/rest/en/shiftcharts`) | **VERIFIED** for 2023 and 2010 |
+| Stats REST game-level (`team/summary`, `goalie/summary` with `isGame=true`) | **VERIFIED.** One row per team-game / goalie-game, including `gamesStarted`, `timeOnIce`, `homeRoad`. Good for cross-checking parsed boxscores |
+| Standings by date | **VERIFIED** (200) |
+| EDGE history | **VERIFIED: starts 2021-22.** 2020-21 returns 404. `seasonsWithEdgeStats` lists 6 seasons (2021-22 → 2026-27) |
+| EDGE granularity | **VERIFIED: season aggregates only.** `team-detail` returns season totals/ranks (shot speed, bursts, max speed, distance, zone-time %, shots by location). Passing a date in place of a season → 404; guessed `/game-log` path → 404. The only per-game data: `skatingDistanceLast10` (team and skater) and `savePctgLast10` (goalie) — the **last 10 games of the queried season**, so historically it only covers each season's final 10 games |
+| Partner odds (`/partner-game/US/now`) | **VERIFIED, current only.** `MONEY_LINE_2_WAY` (American), 3-way, puck line, total, plus `bettingPartner`, `lastUpdatedUTC`. No history. Partner/licensing terms unknown → don't rely on it beyond optional personal forward snapshots |
+| MoneyPuck | Page text: *"free to use for non-commercial purposes and by journalists for ad-hoc use. Please clearly credit MoneyPuck.com … Non-approved scraping of the [site is not allowed]"*. Shot files (2007→present, 124 attributes, xG scores, blocked shots excluded) are hosted on `peter-tanner.com`, which is **not** on the allowlist yet |
+
+Conclusions that change the plan:
+- In-season EDGE features cannot be built leakage-free from history. The only
+  options are prior-season EDGE aggregates (usable for 2022-23 onward) or daily
+  forward snapshots starting now.
+- `starter` is a post-game fact. Using it as a feature is the oracle (leaky) model.
+- Baseline data (schedule, results, PBP with coordinates, shifts, goalie
+  starts) is sufficient from 2010-11 onward, about 16 regular seasons.
 
 ## 0. Blocker: no network access to NHL hosts
 
