@@ -87,8 +87,10 @@ docs/               findings and design notes
   (standard NHL two-way moneyline settlement).
 - Starting goalie: two variants are reported. *Projected* (pre-game info only, deployable)
   and *actual* (uses the post-game `starter` flag; leaky upper bound).
-- Odds: free sources only. The loader schema is documented in `src/nhlmodel/odds/loader.py`.
-  Vig removal: multiplicative by default, power method available.
+- Odds: free sources only. No free historical source has clean terms (see Phase 0 doc §3a),
+  so the **market comparison (Baseline C, Phase 5) is deferred**. Models are judged on log
+  loss, Brier score and calibration only. The loader (`src/nhlmodel/odds/loader.py`) and vig math
+  stay in place for when an odds file the user may use becomes available.
 
 ## Known limitations
 
@@ -98,6 +100,7 @@ docs/               findings and design notes
   in-season EDGE features can't be built without leakage. Only prior-season aggregates are used.
 - Confirmed-starter timing and injuries have no historical as-of source, so both are
   leakage risks; see the goalie variants above.
-- Free historical odds are expected to end around 2022-23 and lack timestamps.
+- No market benchmark yet: without odds we can't say whether the model beats the closing line,
+  the question that matters most for betting.
 - Backtests over a few seasons are noisy and may not generalize. A backtested edge is not
   a monetizable one: sportsbooks limit or close consistently winning accounts.
