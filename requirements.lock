@@ -27,4 +27,5 @@ scikit-learn==1.9.1
 scipy==1.18.1
 six==1.17.0
 threadpoolctl==3.7.0
+tzdata==2025.3
 urllib3==2.8.0

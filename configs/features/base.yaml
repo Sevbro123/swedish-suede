@@ -1,0 +1,32 @@
+# Team-strength and situational feature config. Window choice is an experimental variable:
+# experiments override `windows` to compare 5 / 10 / 20 games, season-to-date and EWM.
+
+# Stat pairs turned into shares F / (F + A); per-game for/against rates are emitted too.
+share_stats: [goals, sog, fenwick, corsi, goals_5v5, fenwick_5v5, corsi_5v5]
+rate_stats: [goals, sog, pp_goals, sh_goals, penalties]
+
+windows:
+  last_n: [5, 10, 20]        # last N games of this franchise; may span seasons (see cross_season)
+  cross_season: true         # last-N windows reach into the previous season early on
+  season_to_date: true       # resets each season; shrunk toward a prior (below)
+  ewm_halflife_games: [5, 15] # exponentially weighted, spans seasons
+
+shrinkage:
+  # Season-to-date stats are blended with k pseudo-games at the prior per-game rate.
+  # Prior = previous-season per-game rate regressed toward the league mean by `regress`
+  # (0 = ignore last season, 1 = trust it fully). Teams with no previous season (first
+  # season of the data, expansion teams) use the league mean as of the game.
+  pseudo_games: 10
+  regress_to_prior: 0.6
+
+situational:
+  rest_days_cap: 10
+  recent_days: 7
+
+# Franchise lineage: team ids that continue an earlier franchise (relocation / rename),
+# so windows and priors carry across the change. Values verified from the games table.
+lineage:
+  52: 11   # Winnipeg Jets (2011-) <- Atlanta Thrashers
+  53: 27   # Arizona Coyotes (2014-) <- Phoenix Coyotes
+  59: 53   # Utah Hockey Club (2024-) <- Arizona Coyotes (hockey operations transferred)
+  68: 59   # Utah Mammoth (2025-) <- Utah Hockey Club
