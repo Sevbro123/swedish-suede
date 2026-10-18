@@ -14,6 +14,11 @@ de-vigged market, with time-ordered validation and confidence intervals.
 | 1 Dataset & features | in progress: cached ingestion, games table, odds loader and vig math done |
 | 2–5 | not started |
 
+**To do (before live/forward use):** an `update` command for the current season. It
+fetches the schedule uncached, downloads per-game data only for games that went final
+at least a day earlier (to pick up NHL stat corrections), caches those, and appends them
+to the processed tables.
+
 ## Setup
 
 ```bash
