@@ -2,359 +2,489 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230a0f0a'/%3E%3Crect x='3' y='11' width='7' height='2' fill='%2333ff66'/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NHLMODEL Terminal</title>
+<title>swedish suede</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230d1424'/%3E%3Ctext x='8' y='12' font-size='11' text-anchor='middle' fill='%232a9fd0' font-family='monospace'%3E%23%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
+  /* ---------- tokens (series colors validated with the dataviz palette checker) ---------- */
   :root {
-    --bg: #0a0f0a; --ink: #33ff66; --dim: #1f9e45; --glow: rgba(51,255,102,.35); --sel-bg: #33ff66; --sel-ink: #0a0f0a;
-    --scan: rgba(0,0,0,.28); --vignette: rgba(0,0,0,.55);
+    color-scheme: light;
+    --bg: #f7f9fc; --card: #ffffff; --line: #dde3ee; --ink: #0e1a2b; --ink-2: #46566f; --muted: #5d6d86;
+    --s1: #1f6fd1; --s2: #b0389f; --s3: #0a8462;
+    --accent: #1f6fd1; --accent-2: #b0389f; --glow: rgba(31,111,209,.12);
+    --field-a: 31,111,209; --field-b: 176,56,159; --field-alpha: .5;
+    --shadow: 0 1px 2px rgba(14,26,43,.06), 0 8px 24px rgba(14,26,43,.06);
   }
-  :root[data-theme="amber"] {
-    --bg: #0f0a03; --ink: #ffb000; --dim: #b07a00; --glow: rgba(255,176,0,.33); --sel-bg: #ffb000; --sel-ink: #0f0a03;
-  }
-  :root[data-theme="paper"] {
-    --bg: #f4f1e6; --ink: #1d4d2b; --dim: #3f6a50; --glow: transparent; --sel-bg: #1d4d2b; --sel-ink: #f4f1e6;
-    --scan: rgba(29,77,43,.06); --vignette: transparent;
-  }
-  @media (prefers-color-scheme: light) {
-    :root:not([data-theme]) {
-      --bg: #f4f1e6; --ink: #1d4d2b; --dim: #3f6a50; --glow: transparent; --sel-bg: #1d4d2b; --sel-ink: #f4f1e6;
-      --scan: rgba(29,77,43,.06); --vignette: transparent;
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0d1424; --card: #121b30; --line: #22304d; --ink: #e6eefc; --ink-2: #a9b8d3; --muted: #8394b3;
+      --s1: #2a9fd0; --s2: #8a72ea; --s3: #1fa57c;
+      --accent: #2a9fd0; --accent-2: #8a72ea; --glow: rgba(42,159,208,.18);
+      --field-a: 42,159,208; --field-b: 138,114,234; --field-alpha: .7;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.25);
     }
   }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0d1424; --card: #121b30; --line: #22304d; --ink: #e6eefc; --ink-2: #a9b8d3; --muted: #8394b3;
+    --s1: #2a9fd0; --s2: #8a72ea; --s3: #1fa57c;
+    --accent: #2a9fd0; --accent-2: #8a72ea; --glow: rgba(42,159,208,.18);
+    --field-a: 42,159,208; --field-b: 138,114,234; --field-alpha: .7;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.25);
+  }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; }
-  body {
-    background: var(--bg); color: var(--ink);
-    font: 21px/1.15 "VT323", "Courier New", ui-monospace, monospace;
-    text-shadow: 0 0 6px var(--glow);
-    font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0;  /* ligatures break the column grid */
-    overflow-x: hidden;
-  }
-  .crt { position: relative; min-height: 100%; padding: 16px; max-width: 1180px; margin: 0 auto; }
-  .crt::before {  /* scanlines */
-    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 5;
-    background: repeating-linear-gradient(to bottom, transparent 0 2px, var(--scan) 2px 3px);
-  }
-  .crt::after {   /* tube vignette */
-    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 6;
-    background: radial-gradient(ellipse at center, transparent 60%, var(--vignette) 100%);
-  }
-  body.no-scan .crt::before, body.no-scan .crt::after { display: none; }
-  pre { margin: 0; font: inherit; white-space: pre; }
-  #footer { white-space: pre-wrap; }
-  .dim { color: var(--dim); }
-  nav { display: flex; flex-wrap: wrap; gap: 0 1ch; margin: .5em 0 .75em; }
-  nav button {
-    font: inherit; color: var(--ink); background: none; border: 0; padding: 0; cursor: pointer; text-shadow: inherit;
-  }
-  nav button[aria-selected="true"] { background: var(--sel-bg); color: var(--sel-ink); text-shadow: none; }
-  nav button:focus-visible, .row:focus-visible, .key:focus-visible { outline: 1px dashed var(--ink); outline-offset: 2px; }
-  #screen { min-height: 60vh; }
-  .row { display: inline; cursor: default; }
-  .row:hover, .row:focus { background: color-mix(in srgb, var(--ink) 14%, transparent); outline: none; }
-  .cursor { display: inline-block; width: 1ch; background: var(--ink); animation: blink 1.06s steps(1) infinite; }
-  @keyframes blink { 50% { opacity: 0; } }
-  #tip {
-    position: fixed; z-index: 10; pointer-events: none; display: none; max-width: min(46ch, 90vw);
-    background: var(--bg); color: var(--ink); border: 1px solid var(--ink); padding: 4px 8px; white-space: pre-wrap;
-  }
-  #boot { position: fixed; inset: 0; z-index: 20; background: var(--bg); padding: 16px; overflow: hidden; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 "Space Grotesk", system-ui, sans-serif; }
+  .mono, .bar-fill, .glyph { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-ligatures: none; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .key { font: inherit; color: var(--ink); background: none; border: 0; padding: 0; cursor: pointer; text-shadow: inherit; text-decoration: underline; }
-  @media (prefers-reduced-motion: reduce) { .cursor { animation: none; } }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+  /* ---------- nav ---------- */
+  header.nav {
+    position: sticky; top: 0; z-index: 20; backdrop-filter: saturate(140%) blur(10px);
+    background: color-mix(in srgb, var(--bg) 78%, transparent); border-bottom: 1px solid var(--line);
+  }
+  .nav-in { display: flex; align-items: center; gap: 16px; height: 56px; }
+  .brand { font-weight: 700; letter-spacing: .01em; text-decoration: none; color: var(--ink); white-space: nowrap; font-size: 17px; }
+  .brand .glyph { color: var(--accent); margin-right: 8px; }
+  .links { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1; }
+  .links::-webkit-scrollbar { display: none; }
+  .links a {
+    color: var(--ink-2); text-decoration: none; padding: 6px 10px; border-radius: 8px; white-space: nowrap; font-size: 15px;
+    transition: background .2s, color .2s;
+  }
+  .links a:hover, .links a[aria-current="true"] { background: var(--glow); color: var(--ink); }
+  .theme-btn {
+    border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 8px; padding: 6px 10px;
+    font: 13px "JetBrains Mono", monospace; cursor: pointer; white-space: nowrap;
+  }
+  @media (max-width: 560px) { .brand-text { display: none; } }
+
+  /* ---------- hero ---------- */
+  .hero { position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }
+  #field { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .hero::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(to bottom, transparent 55%, var(--bg)),
+                radial-gradient(ellipse at 22% 48%, color-mix(in srgb, var(--bg) 78%, transparent), transparent 62%);
+  }
+  .hero-in { position: relative; z-index: 1; padding: 88px 16px 72px; pointer-events: none; }
+  .hero-in > * { pointer-events: auto; }
+  .eyebrow { font: 13px "JetBrains Mono", monospace; color: var(--accent); letter-spacing: .12em; text-transform: uppercase; }
+  h1 { font-size: clamp(36px, 6vw, 64px); line-height: 1.05; margin: 10px 0 14px; letter-spacing: -.02em; max-width: 15ch; }
+  .lede { color: var(--ink-2); max-width: 56ch; font-size: 18px; margin: 0; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 36px; max-width: 780px; }
+  .tile { background: color-mix(in srgb, var(--card) 86%, transparent); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .tile .k { font-size: 13px; color: var(--muted); }
+  .tile .v { font: 600 26px "JetBrains Mono", monospace; margin-top: 2px; }
+  .tile .s { font-size: 13px; color: var(--ink-2); }
+
+  /* ---------- sections ---------- */
+  section.block { padding: 56px 0 8px; }
+  h2 { font: 700 28px "Space Grotesk", sans-serif; margin: 0 0 6px; letter-spacing: -.01em; }
+  h2 .glyph { color: var(--accent); font-size: 18px; margin-right: 10px; font-weight: 400; }
+  h3 { margin: 0 0 10px; font-size: 16px; }
+  .sub { color: var(--ink-2); margin: 0 0 20px; max-width: 70ch; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid2 > * { min-width: 0; }  /* let cards shrink below their unwrappable ascii content */
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } .hero-in { padding: 56px 16px 48px; } }
+  .chip { display: inline-block; font: 12px "JetBrains Mono", monospace; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-2); }
+
+  /* ---------- ascii bars ---------- */
+  .bar-row { display: grid; grid-template-columns: 128px 1fr 64px; align-items: center; gap: 10px; padding: 4px 6px; border-radius: 8px; }
+  .bar-row:hover, .bar-row:focus-visible { background: var(--glow); }
+  .bar-row .lab { font-size: 14px; color: var(--ink-2); }
+  .bar-row .val { font: 14px "JetBrains Mono", monospace; text-align: right; }
+  @media (max-width: 520px) { .bar-row { grid-template-columns: 1fr 58px; } .bar-row .lab { grid-column: 1 / -1; } }
+  .bar-track { position: relative; height: 22px; border-radius: 6px; background: color-mix(in srgb, var(--ink) 6%, transparent); overflow: hidden; }
+  .bar-fill {
+    position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 0 6px 6px 0; overflow: hidden; white-space: nowrap;
+    font-size: 13px; line-height: 22px; letter-spacing: 1px; color: var(--bg); background: var(--c);
+    transition: width 900ms cubic-bezier(.2,.8,.2,1);
+  }
+  .bar-fill::before { content: attr(data-tex); opacity: .5; padding-left: 3px; }
+  @media (prefers-reduced-motion: reduce) { .bar-fill { transition: none; } }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 8px; font-size: 14px; color: var(--ink-2); }
+  .legend .sw { display: inline-grid; place-items: center; width: 22px; height: 16px; border-radius: 4px; margin-right: 6px; vertical-align: -3px;
+    background: var(--c); color: var(--bg); font: 600 11px "JetBrains Mono", monospace; }
+  .season-group { padding: 12px 0; border-top: 1px dashed var(--line); }
+  .season-group:first-of-type { border-top: 0; }
+  .season-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; margin: 0 6px 6px; }
+  .season-head span { font-size: 13px; color: var(--muted); }
+
+  /* ---------- table ---------- */
+  .tbl-wrap { overflow-x: auto; }
+  table.data { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.data th, table.data td { padding: 9px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.data th:first-child, table.data td:first-child { text-align: left; }
+  table.data th { font-weight: 500; color: var(--ink-2); }
+  table.data th button { all: unset; cursor: pointer; }
+  table.data th button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  table.data th[aria-sort] button::after { content: " ."; color: var(--muted); font-family: "JetBrains Mono", monospace; }
+  table.data th[aria-sort="ascending"] button::after { content: " ^"; color: var(--accent); }
+  table.data th[aria-sort="descending"] button::after { content: " v"; color: var(--accent); }
+  table.data tbody tr { transition: background .15s; }
+  table.data tbody tr:hover { background: var(--glow); }
+  td .mini { font: 12px "JetBrains Mono", monospace; color: var(--accent); letter-spacing: 1px; margin-right: 8px; }
+  td.pending { color: var(--muted); }
+  .flag { color: var(--accent-2); font-weight: 600; }
+
+  /* ---------- progress + phases ---------- */
+  .prog { font: 13px "JetBrains Mono", monospace; color: var(--ink-2); overflow: hidden; white-space: nowrap; }
+  .prog .tr { color: color-mix(in srgb, var(--ink) 25%, transparent); }
+  .prog .fl { color: var(--accent); }
+  .prog-head { display: flex; justify-content: space-between; font-size: 14px; }
+  ol.phases { list-style: none; margin: 0; padding: 0; }
+  ol.phases li { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); align-items: center; }
+  ol.phases li:last-child { border-bottom: 0; }
+  .ph-ico { font: 14px "JetBrains Mono", monospace; color: var(--muted); }
+  .ph-ico.done { color: var(--s3); } .ph-ico.wip { color: var(--accent); }
+
+  /* ---------- empty states ---------- */
+  .empty { display: grid; grid-template-columns: auto 1fr; gap: 20px; align-items: center; }
+  .empty pre { margin: 0; font: 13px/1.15 "JetBrains Mono", monospace; color: var(--accent); }
+  .empty h3 { margin: 0 0 4px; font-size: 18px; }
+  .empty p { margin: 0; color: var(--ink-2); }
+  @media (max-width: 520px) { .empty { grid-template-columns: 1fr; } }
+
+  /* ---------- tooltip ---------- */
+  #tip { position: fixed; z-index: 50; pointer-events: none; opacity: 0; transform: translateY(4px); transition: opacity .12s, transform .12s;
+    background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; box-shadow: var(--shadow);
+    font-size: 13px; max-width: 280px; white-space: pre-line; }
+  #tip.on { opacity: 1; transform: none; }
+
+  footer { margin-top: 64px; border-top: 1px solid var(--line); padding: 24px 0 40px; color: var(--muted); font-size: 14px; }
+  footer .mono { font-size: 13px; margin-top: 4px; }
 </style>
 </head>
 <body>
-<div id="boot" aria-hidden="true"><pre id="boot-text"></pre></div>
-<main class="crt">
-  <pre id="banner" aria-label="NHLMODEL terminal"></pre>
-  <nav role="tablist" aria-label="Sections" id="nav"></nav>
-  <section id="screen" aria-live="polite"></section>
-  <pre id="footer" class="dim"></pre>
+<header class="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="#top" aria-label="swedish suede"><span class="glyph mono">[#]</span><span class="brand-text">swedish suede</span></a>
+    <nav class="links" aria-label="Sections" id="links">
+      <a href="#overview">Overview</a><a href="#data">Data</a><a href="#xg">Expected goals</a>
+      <a href="#experiments">Experiments</a><a href="#games">Games</a><a href="#calc">Calculator</a>
+    </nav>
+    <button class="theme-btn" id="theme" type="button">theme: auto</button>
+  </div>
+</header>
+
+<main id="top">
+  <div class="hero">
+    <canvas id="field" aria-hidden="true"></canvas>
+    <div class="wrap hero-in">
+      <div class="eyebrow">swedish suede &middot; research build <span id="rev"></span></div>
+      <h1 data-decode>Win probability, measured honestly.</h1>
+      <p class="lede">An NHL moneyline model evaluated the way a skeptic would: strictly time-ordered splits, held-out seasons and confidence intervals. Analysis only. Nothing here places or recommends wagers.</p>
+      <div class="tiles" id="tiles"></div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <section class="block" id="overview" aria-labelledby="h-overview">
+      <h2 id="h-overview"><span class="glyph mono">01</span><span data-decode>Overview</span></h2>
+      <p class="sub">Where the project stands. Every number on this page is read from files on disk when the page is built; sections without results say so.</p>
+      <div class="grid2">
+        <div class="card"><h3>Download progress</h3><div id="progress"></div></div>
+        <div class="card"><h3>Phases</h3><ol class="phases" id="phases"></ol></div>
+      </div>
+    </section>
+
+    <section class="block" id="data" aria-labelledby="h-data">
+      <h2 id="h-data"><span class="glyph mono">02</span><span data-decode>Data quality</span></h2>
+      <p class="sub">One row per regular season; click a column to sort. <b>Goals</b>: games where play-by-play goals equal the final score. <b>Starters</b>: games with exactly two starting goalies. <b>Shift flags</b>: shift charts failing the team time-on-ice check (features skip their shift-based stats).</p>
+      <div class="card tbl-wrap"><table class="data" id="dq"></table></div>
+    </section>
+
+    <section class="block" id="xg" aria-labelledby="h-xg">
+      <h2 id="h-xg"><span class="glyph mono">03</span><span data-decode>Expected goals</span></h2>
+      <p class="sub" id="xg-sub"></p>
+      <div class="card" id="xg-card"></div>
+    </section>
+
+    <section class="block" id="experiments" aria-labelledby="h-exp">
+      <h2 id="h-exp"><span class="glyph mono">04</span><span data-decode>Experiments</span></h2>
+      <p class="sub">Window length, EDGE features, and layered vs. single models, each with bootstrap confidence intervals on held-out seasons.</p>
+      <div class="card" id="exp-card"></div>
+    </section>
+
+    <section class="block" id="games" aria-labelledby="h-games">
+      <h2 id="h-games"><span class="glyph mono">05</span><span data-decode>Game explorer</span></h2>
+      <p class="sub">Held-out predictions game by game, with the three goalie variants side by side.</p>
+      <div class="card" id="games-card"></div>
+    </section>
+
+    <section class="block" id="calc" aria-labelledby="h-calc">
+      <h2 id="h-calc"><span class="glyph mono">06</span><span data-decode>What-if calculator</span></h2>
+      <p class="sub">Pick teams, goalies and rest, and watch the probability move. Runs in the browser from exported model coefficients.</p>
+      <div class="card" id="calc-card"></div>
+    </section>
+  </div>
 </main>
+
+<footer>
+  <div class="wrap">
+    <div>swedish suede &middot; analysis only. A backtested edge is not a monetizable one.</div>
+    <div class="mono" id="build"></div>
+  </div>
+</footer>
 <div id="tip" role="tooltip"></div>
+
 <script id="payload" type="application/json">/*__DATA__*/null</script>
 <script>
 (() => {
   const D = JSON.parse(document.getElementById("payload").textContent);
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const store = {
     get(k) { try { return localStorage.getItem(k); } catch { return null; } },
-    set(k, v) { try { localStorage.setItem(k, v); } catch { /* storage unavailable */ } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch { /* unavailable */ } },
   };
-
-  // ---------- geometry: how many monospace columns fit ----------
-  let COLS = 80;
-  function measure() {
-    const probe = document.createElement("pre");
-    probe.style.cssText = "position:absolute;visibility:hidden";
-    probe.textContent = "M".repeat(100);
-    document.body.appendChild(probe);
-    const cw = probe.getBoundingClientRect().width / 100;
-    probe.remove();
-    const avail = $("screen").getBoundingClientRect().width || window.innerWidth - 32;
-    COLS = Math.max(34, Math.min(110, Math.floor(avail / cw)));
-  }
-
-  // ---------- ASCII primitives ----------
-  const pad = (s, n, right = false) => { s = String(s); return s.length >= n ? s.slice(0, n) : right ? " ".repeat(n - s.length) + s : s + " ".repeat(n - s.length); };
-  // Pure 7-bit ASCII only: box-drawing/block glyphs come from fallback fonts with different
-  // advance widths and break column alignment.
-  function boxTop(title, w) { const t = title ? `[ ${title} ]` : ""; return "+=" + t + "=".repeat(Math.max(0, w - 3 - t.length)) + "+"; }
-  const boxBot = (w) => "+" + "=".repeat(w - 2) + "+";
-  const boxLine = (s, w) => "| " + pad(s, w - 4) + " |";
-  const rule = (w, ch = "-") => ch.repeat(w);
-  function bar(v, max, width, glyph = "#") {
-    if (v == null || !isFinite(v) || max <= 0) return pad("", width);
-    const n = Math.max(0, Math.min(width, Math.round((v / max) * width)));
-    return glyph.repeat(n) + ".".repeat(width - n);
-  }
-  const pct = (x) => (x == null ? "  -  " : (100 * x).toFixed(1) + "%");
-
-  // Wrap a prose line to the frame's inner width, keeping its indent on continuation lines.
-  function wrap(s, width) {
-    if (s.length <= width) return [s];
-    const indent = s.match(/^ */)[0], words = s.trim().split(/ +/), out = [];
-    let line = indent;
-    for (const w of words) {
-      if (line.trim() && (line + " " + w).length > width) { out.push(line); line = indent + "  " + w; }
-      else line = line.trim() ? line + " " + w : indent + w;
-    }
-    out.push(line);
-    return out;
-  }
-
-  // A frame whose body lines may carry hover/focus metadata.
-  // lines: string (prose, wrapped to fit) | {text, tip} (table rows, fitted by the caller)
-  function frame(title, lines) {
-    const w = COLS;
-    const out = [`<span aria-hidden="true">${esc(boxTop(title, w))}</span>`];
-    lines = lines.flatMap((l) => (typeof l === "string" ? wrap(l, w - 4) : [l]));
-    for (const l of lines) {
-      const text = typeof l === "string" ? l : l.text;
-      const body = esc(boxLine(text, w));
-      out.push(typeof l === "string" || !l.tip ? body
-        : `<span class="row" tabindex="0" data-tip="${esc(l.tip)}">${body}</span>`);
-    }
-    out.push(`<span aria-hidden="true">${esc(boxBot(w))}</span>`);
-    return `<pre>${out.join("\n")}</pre>`;
-  }
-  function srTable(caption, head, rows) {
-    return `<div class="sr"><table><caption>${esc(caption)}</caption><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${
-      rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
-  }
-  const pending = (what, why) => frame(what, ["", `  NO DATA.  ${why}`, "", "  Nothing is shown here until real results exist.", ""]);
-
-  // ---------- screens ----------
+  const pct = (x, d = 1) => (x == null ? "-" : (100 * x).toFixed(d) + "%");
+  const fmt = (n) => Number(n).toLocaleString();
   const S = D.data.seasons;
   const processed = S.filter((s) => s.processed);
-  const totalGames = D.data.total_games;
-  const pbpDone = S.reduce((a, s) => a + Math.min(s.pbp_downloaded, s.games), 0);
-  const shDone = S.reduce((a, s) => a + Math.min(s.shifts_downloaded, s.games), 0);
-
-  const screens = {
-    status() {
-      const bw = Math.max(10, COLS - 34);
-      const lines = [
-        "",
-        `  SEASONS IN GAMES TABLE ..... ${S.length}   (${S[0].label} -> ${S[S.length - 1].label})`,
-        `  REGULAR-SEASON GAMES ....... ${totalGames.toLocaleString()}`,
-        `  SEASONS PROCESSED .......... ${processed.length} / ${S.length}`,
-        "",
-        { text: `  PLAY-BY-PLAY  ${bar(pbpDone, totalGames, bw)} ${pad(pct(pbpDone / totalGames), 6, true)}`,
-          tip: `Play-by-play downloaded: ${pbpDone.toLocaleString()} of ${totalGames.toLocaleString()} games` },
-        { text: `  SHIFT CHARTS  ${bar(shDone, totalGames, bw)} ${pad(pct(shDone / totalGames), 6, true)}`,
-          tip: `Shift charts downloaded: ${shDone.toLocaleString()} of ${totalGames.toLocaleString()} games` },
-        "",
-      ];
-      const phases = [
-        ["0", "DATA DISCOVERY", "DONE"], ["1", "DATASET + FEATURES", "IN PROGRESS"], ["2", "BASELINES", "NOT STARTED"],
-        ["3", "MODEL FAMILIES", "NOT STARTED"], ["4", "EXPERIMENTS", "NOT STARTED"], ["5", "MARKET BACKTEST", "DEFERRED (NO ODDS)"],
-      ];
-      const ph = phases.map(([n, name, st]) => `  PHASE ${n}  ${pad(name, 22)} ${st === "DONE" ? "[X]" : st === "IN PROGRESS" ? "[~]" : "[ ]"} ${st}`);
-      return frame("SYSTEM STATUS", lines) + "\n" + frame("PHASES", ["", ...ph, ""]) +
-        srTable("Download progress", ["item", "done", "total"], [["play-by-play", pbpDone, totalGames], ["shift charts", shDone, totalGames]]);
-    },
-
-    data() {
-      const narrow = COLS < 70;
-      const head = narrow
-        ? ` ${pad("SEASON", 7)} ${pad("GAMES", 5, true)} ${pad("GOALS", 6, true)} ${pad("START", 6, true)} ${pad("FLAG", 4, true)}`
-        : `  ${pad("SEASON", 7)} ${pad("GAMES", 6, true)}  ${pad("DOWNLOADED", 19)}    ${pad("GOALS", 6, true)}  ${pad("STARTERS", 10, true)}  ${pad("SHIFT FLAGS", 11, true)}  ${pad("XY SHOTS/GP", 11, true)}`;
-      const bw = 12;
-      const rows = S.slice().reverse().map((s) => {
-        const dl = Math.min(s.pbp_downloaded, s.shifts_downloaded) / s.games;
-        const g = s.processed ? pad(pct(s.goals_match), 6, true) : "   ...";
-        const st = s.processed ? pad(pct(s.two_starters), 10, true) : pad("...", 10, true);
-        const fl = s.processed ? pad(s.shifts_flagged, 11, true) : pad("...", 11, true);
-        const xy = s.processed ? pad(s.shots_xy_per_game.toFixed(1), 11, true) : pad("...", 11, true);
-        const text = narrow
-          ? ` ${pad(s.label, 7)} ${pad(s.games, 5, true)} ${g} ${pad(s.processed ? pct(s.two_starters) : "...", 6, true)} ${pad(s.processed ? s.shifts_flagged : "...", 4, true)}`
-          : `  ${pad(s.label, 7)} ${pad(s.games, 6, true)}  ${bar(dl, 1, bw, "#")} ${pad(pct(dl), 6, true)}    ${g}  ${st}  ${fl}  ${xy}`;
-        const tip = `${s.label}: ${s.games} games, home win rate ${pct(s.home_win_rate)}\n` +
-          `downloaded: pbp ${s.pbp_downloaded}, shifts ${s.shifts_downloaded}\n` +
-          (s.processed ? `pbp goals = final score: ${pct(s.goals_match)}\nexactly 2 starters: ${pct(s.two_starters)}\nshift charts flagged: ${s.shifts_flagged}`
-            : "not processed yet");
-        return { text, tip };
-      });
-      const note = ["", "  GOALS: share of games where play-by-play goals equal the final score.",
-        "  STARTERS (START): share of games with exactly 2 starting goalies.",
-        "  FLAGS: shift charts failing the team time-on-ice check; features skip shift-based stats for those games.", ""];
-      return frame("DATA QUALITY BY SEASON", ["", head, "  " + rule(COLS - 8), ...rows, ...note]) +
-        srTable("Data quality by season", ["season", "games", "pbp downloaded", "shifts downloaded", "goals match", "two starters", "shift flags"],
-          S.map((s) => [s.label, s.games, s.pbp_downloaded, s.shifts_downloaded, s.processed ? s.goals_match : "", s.processed ? s.two_starters : "", s.processed ? s.shifts_flagged : ""]));
-    },
-
-    xg() {
-      if (!D.xg) return pending("EXPECTED GOALS", "results/xg_eval.csv not found.");
-      const R = D.xg.rows;
-      const max = Math.max(...R.flatMap((r) => [r.xg, r.distance, r.constant]));
-      const bw = Math.max(10, COLS - 36);
-      const series = [["XG MODEL", "xg", "#"], ["DISTANCE", "distance", "%"], ["CONSTANT", "constant", ":"]];
-      const lines = ["", `  SPLIT: ${D.xg.split}`, "  METRIC: log loss per shot (lower is better). Bars start at 0.", ""];
-      for (const r of R) {
-        lines.push(`  HELD-OUT ${r.label}   trained on ${r.train}   shots ${r.n_test.toLocaleString()}`);
-        for (const [name, k, gl] of series) {
-          lines.push({ text: `    ${pad(name, 9)} ${bar(r[k], max, bw, gl)} ${r[k].toFixed(4)}`,
-                       tip: `${name} on held-out ${r.label}\nlog loss ${r[k].toFixed(4)}\n(${r.n_test.toLocaleString()} shots)` });
-        }
-        lines.push({ text: `    TOTAL XG / GOALS  ${r.xg_over_goals.toFixed(3)}  (1.000 = calibrated in total)`,
-                     tip: `Sum of predicted xG divided by actual goals on held-out ${r.label}` });
-        lines.push("");
-      }
-      lines.push("  KEY:  # xG model   % distance+angle logistic   : constant goal rate", `  FILE MODIFIED ${D.xg.modified}`, "");
-      return frame("EXPECTED GOALS: HELD-OUT EVALUATION", lines) +
-        srTable("xG log loss by held-out season", ["held-out season", "trained on", "shots", "xG", "distance", "constant", "xG/goals"],
-          R.map((r) => [r.label, r.train, r.n_test, r.xg, r.distance, r.constant, r.xg_over_goals]));
-    },
-
-    experiments() {
-      return D.experiments ? frame("EXPERIMENTS", ["", "  (results table renderer arrives with Phase 2)", ""])
-        : pending("EXPERIMENTS", "Phase 2 has not been run.");
-    },
-    games() { return pending("GAME EXPLORER", "Needs held-out predictions (Phase 2)."); },
-    calc() { return pending("WHAT-IF CALCULATOR", "Needs a trained model (Baseline B)."); },
+  const total = D.data.total_games;
+  const pbp = S.reduce((a, s) => a + Math.min(s.pbp_downloaded, s.games), 0);
+  const sh = S.reduce((a, s) => a + Math.min(s.shifts_downloaded, s.games), 0);
+  const asciiBar = (frac, n) => {
+    const k = Math.round(Math.max(0, Math.min(1, frac)) * n);
+    return `<span class="fl">${"#".repeat(k)}</span><span class="tr">${".".repeat(n - k)}</span>`;
   };
-  const TABS = [["1", "status", "STATUS"], ["2", "data", "DATA"], ["3", "xg", "XG"], ["4", "experiments", "EXPERIMENTS"],
-                ["5", "games", "GAMES"], ["6", "calc", "CALC"]];
 
-  // ---------- chrome ----------
-  const BANNER = [
-    " _   _ _   _ _     __  __  ___  ___  ___ _    ",
-    "| \\ | | | | | |   |  \\/  |/ _ \\|   \\| __| |   ",
-    "|  \\| | |_| | |__ | |\\/| | (_) | |) | _|| |__ ",
-    "|_|\\__|_| |_|____||_|  |_|\\___/|___/|___|____|",
-  ];
-  let current = store.get("nhlmodel.tab") || "status";
-  if (!screens[current]) current = "status";
+  // ---------- reactive ascii field (hero) ----------
+  const field = (() => {
+    const cv = $("field"), ctx = cv.getContext("2d");
+    const RAMP = " .:-=+*#%@";
+    let W = 0, H = 0, cols = 0, rows = 0, cell = 14, t = 0, raf = 0, visible = true, last = 0;
+    let colA = [42, 159, 208], colB = [138, 114, 234], alpha = .7;
+    const mouse = { x: -1e4, y: -1e4, tx: -1e4, ty: -1e4 };
+    const ripples = [];
+    function readColors() {
+      const cs = getComputedStyle(document.documentElement);
+      colA = cs.getPropertyValue("--field-a").split(",").map(Number);
+      colB = cs.getPropertyValue("--field-b").split(",").map(Number);
+      alpha = parseFloat(cs.getPropertyValue("--field-alpha")) || .6;
+    }
+    function resize() {
+      const r = cv.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1);
+      W = r.width; H = r.height; cv.width = W * dpr; cv.height = H * dpr;
+      cell = W < 600 ? 12 : 14; cols = Math.ceil(W / (cell * .62)); rows = Math.ceil(H / cell);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.font = `${cell}px "JetBrains Mono", ui-monospace, monospace`; ctx.textBaseline = "top";
+    }
+    function draw(now) {
+      raf = 0;
+      if (!reduced && now - last < 33) { schedule(); return; }  // ~30 fps
+      last = now; if (!reduced) t += .016;
+      mouse.x += (mouse.tx - mouse.x) * .12; mouse.y += (mouse.ty - mouse.y) * .12;
+      ctx.clearRect(0, 0, W, H);
+      const cw = cell * .62;
+      for (let j = 0; j < rows; j++) {
+        const y = j * cell;
+        for (let i = 0; i < cols; i++) {
+          const x = i * cw;
+          let v = Math.sin(i * .11 + t * .9) + Math.sin(j * .17 - t * .7) + Math.sin((i + j) * .07 + t * .5)
+                + Math.sin(Math.hypot(i - cols * .7, j - rows * .4) * .16 - t * 1.3);
+          v = (v + 4) / 8;
+          v += Math.max(0, 1 - Math.hypot(x - mouse.x, y - mouse.y) / 160) * .55;   // pointer lens
+          for (const r of ripples) v += Math.max(0, 1 - Math.abs(Math.hypot(x - r.x, y - r.y) - r.r) / 26) * r.a * .8;
+          v = Math.max(0, Math.min(.999, v));
+          const ch = RAMP[Math.floor(v * RAMP.length)];
+          if (ch === " ") continue;
+          const m = i / cols;
+          ctx.fillStyle = `rgba(${Math.round(colA[0] * (1 - m) + colB[0] * m)},${Math.round(colA[1] * (1 - m) + colB[1] * m)},${
+            Math.round(colA[2] * (1 - m) + colB[2] * m)},${(alpha * (.25 + v * .75)).toFixed(3)})`;
+          ctx.fillText(ch, x, y);
+        }
+      }
+      for (let k = ripples.length - 1; k >= 0; k--) { const r = ripples[k]; r.r += 6; r.a *= .965; if (r.a < .03) ripples.splice(k, 1); }
+      if (!reduced) schedule();
+    }
+    function schedule() { if (!raf && visible && !document.hidden) raf = requestAnimationFrame(draw); }
+    const redrawStatic = () => { if (reduced) draw(performance.now()); };
+    const hero = cv.parentElement;
+    hero.addEventListener("pointermove", (e) => { const r = cv.getBoundingClientRect(); mouse.tx = e.clientX - r.left; mouse.ty = e.clientY - r.top; });
+    hero.addEventListener("pointerleave", () => { mouse.tx = mouse.ty = -1e4; });
+    hero.addEventListener("pointerdown", (e) => {
+      if (reduced) return; const r = cv.getBoundingClientRect(); ripples.push({ x: e.clientX - r.left, y: e.clientY - r.top, r: 0, a: 1 });
+    });
+    new IntersectionObserver(([en]) => { visible = en.isIntersecting; schedule(); }).observe(cv);
+    document.addEventListener("visibilitychange", schedule);
+    addEventListener("resize", () => { resize(); redrawStatic(); });
+    readColors(); resize();
+    if (document.fonts) document.fonts.ready.then(() => { resize(); redrawStatic(); });
+    if (reduced) draw(performance.now()); else schedule();
+    return { recolor() { readColors(); redrawStatic(); } };
+  })();
 
-  function renderNav() {
-    $("nav").innerHTML = TABS.map(([k, id, label]) =>
-      `<button role="tab" id="tab-${id}" aria-selected="${id === current}" data-tab="${id}">[${k}] ${label}</button>`).join("");
+  // ---------- theme ----------
+  const themes = ["auto", "dark", "light"];
+  let theme = store.get("suede.theme");
+  if (!themes.includes(theme)) theme = "auto";
+  function applyTheme() {
+    if (theme === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = theme;
+    $("theme").textContent = "theme: " + theme;
+    $("theme").setAttribute("aria-label", `Color theme: ${theme}. Click to change.`);
+    field.recolor();
   }
-  function renderFooter() {
-    const theme = document.documentElement.dataset.theme || "auto";
-    $("footer").innerHTML = esc(rule(COLS, "-")) + "\n" +
-      esc(`BUILT ${D.built_at} | REV ${D.git_rev} | THEME ${theme.toUpperCase()}`) + "\n" +
-      `<button class="key" data-act="theme">[T]HEME</button> <button class="key" data-act="scan">[S]CANLINES</button> ` +
-      `<button class="key" data-act="help">[?]HELP</button>  &gt;<span class="cursor">&nbsp;</span>`;
-  }
-  function render() {
-    measure();
-    $("banner").textContent = COLS >= 50 ? BANNER.join("\n") : "NHLMODEL";
-    renderNav();
-    $("screen").innerHTML = screens[current]();
-    $("screen").setAttribute("aria-labelledby", `tab-${current}`);
-    renderFooter();
-  }
-  function go(id) { current = id; store.set("nhlmodel.tab", id); render(); }
+  $("theme").addEventListener("click", () => { theme = themes[(themes.indexOf(theme) + 1) % 3]; store.set("suede.theme", theme); applyTheme(); });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => field.recolor());
+  applyTheme();
 
-  const THEMES = ["green", "amber", "paper"];
-  function setTheme(t) { document.documentElement.dataset.theme = t; store.set("nhlmodel.theme", t); renderFooter(); }
-  const savedTheme = store.get("nhlmodel.theme");
-  if (THEMES.includes(savedTheme)) document.documentElement.dataset.theme = savedTheme;
-  if (store.get("nhlmodel.scan") === "off") document.body.classList.add("no-scan");
-  function cycleTheme() {
-    const cur = document.documentElement.dataset.theme ||
-      (matchMedia("(prefers-color-scheme: light)").matches ? "paper" : "green");
-    setTheme(THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length]);
+  // ---------- decode-in headings ----------
+  const GLYPHS = "#%&*+=-:.<>/\\|[]{}";
+  function decode(el) {
+    if (reduced) return;
+    const final = el.textContent, start = performance.now(), dur = 650;
+    el.setAttribute("aria-label", final);
+    const step = (now) => {
+      const p = Math.min(1, (now - start) / dur), n = Math.floor(p * final.length);
+      el.textContent = final.slice(0, n) + final.slice(n).replace(/\S/g, () => GLYPHS[(Math.random() * GLYPHS.length) | 0]);
+      if (p < 1) requestAnimationFrame(step); else { el.textContent = final; el.removeAttribute("aria-label"); }
+    };
+    requestAnimationFrame(step);
   }
-  function toggleScan() {
-    const off = document.body.classList.toggle("no-scan");
-    store.set("nhlmodel.scan", off ? "off" : "on");
-  }
-  function help() {
-    $("screen").innerHTML = frame("HELP", ["", "  1-6   switch section          T   cycle theme (green / amber / paper)",
-      "  S     scanlines on/off       ?   this help", "  Hover or Tab onto a row for details.", "",
-      "  Every number here is read from files on disk. Sections without", "  real results say NO DATA instead of showing placeholders.", ""]);
-  }
+  const decObs = new IntersectionObserver((ents) => ents.forEach((en) => {
+    if (en.isIntersecting) { decode(en.target); decObs.unobserve(en.target); }
+  }), { threshold: .6 });
+  document.querySelectorAll("[data-decode]").forEach((el) => decObs.observe(el));
 
-  document.addEventListener("click", (e) => {
-    const t = e.target.closest("[data-tab]"); if (t) return go(t.dataset.tab);
-    const a = e.target.closest("[data-act]"); if (!a) return;
-    ({ theme: cycleTheme, scan: toggleScan, help })[a.dataset.act]();
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    const tab = TABS.find(([k]) => k === e.key); if (tab) return go(tab[1]);
-    if (e.key === "t" || e.key === "T") cycleTheme();
-    else if (e.key === "s" || e.key === "S") toggleScan();
-    else if (e.key === "?") help();
-  });
-
-  // ---------- tooltips (hover + keyboard focus) ----------
+  // ---------- tooltip (hover + keyboard focus) ----------
   const tip = $("tip");
-  function showTip(el, x, y) {
-    tip.textContent = el.dataset.tip; tip.style.display = "block";
+  function showTip(text, x, y) {
+    tip.textContent = text; tip.classList.add("on");
     const r = tip.getBoundingClientRect();
-    tip.style.left = Math.min(x + 14, innerWidth - r.width - 8) + "px";
-    tip.style.top = Math.min(y + 14, innerHeight - r.height - 8) + "px";
+    tip.style.left = Math.max(8, Math.min(x + 14, innerWidth - r.width - 8)) + "px";
+    tip.style.top = Math.max(8, Math.min(y + 16, innerHeight - r.height - 8)) + "px";
   }
-  document.addEventListener("mousemove", (e) => {
-    const el = e.target.closest("[data-tip]"); if (el) showTip(el, e.clientX, e.clientY); else tip.style.display = "none";
+  document.addEventListener("pointermove", (e) => {
+    const el = e.target.closest("[data-tip]"); if (el) showTip(el.dataset.tip, e.clientX, e.clientY); else tip.classList.remove("on");
   });
   document.addEventListener("focusin", (e) => {
-    const el = e.target.closest("[data-tip]"); if (!el) return;
-    const r = el.getBoundingClientRect(); showTip(el, r.left + 24, r.bottom);
+    const el = e.target.closest("[data-tip]"); if (el) { const r = el.getBoundingClientRect(); showTip(el.dataset.tip, r.left, r.bottom); }
   });
-  document.addEventListener("focusout", () => { tip.style.display = "none"; });
+  document.addEventListener("focusout", () => tip.classList.remove("on"));
 
-  let resizeT; addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(render, 120); });
+  // ---------- hero tiles ----------
+  const latestXg = D.xg ? D.xg.rows[D.xg.rows.length - 1] : null;
+  $("rev").textContent = "@ " + D.git_rev;
+  $("tiles").innerHTML = [
+    ["Regular-season games", fmt(total), `${S[0].label} to ${S[S.length - 1].label}`],
+    ["Seasons processed", `${processed.length}/${S.length}`, "quality-checked, published"],
+    ["Raw data downloaded", pct((pbp + sh) / (2 * total), 0), "play-by-play + shift charts"],
+    latestXg ? ["xG log loss", latestXg.xg.toFixed(4), `held-out ${latestXg.label}`] : ["xG log loss", "-", "not evaluated yet"],
+  ].map(([k, v, s]) => `<div class="tile"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="s">${esc(s)}</div></div>`).join("");
 
-  // ---------- boot sequence ----------
-  const bootLines = [
-    "NHLMODEL BIOS v0.1  (c) research use only",
-    "",
-    "MEMORY TEST ........ 640K OK",
-    `GAMES TABLE ........ ${totalGames.toLocaleString()} RECORDS`,
-    `SEASONS PROCESSED .. ${processed.length}/${S.length}`,
-    `XG EVALUATION ...... ${D.xg ? D.xg.rows.length + " HELD-OUT SEASONS" : "NOT FOUND"}`,
-    "WAGERING MODULE .... NOT INSTALLED (BY DESIGN)",
-    "",
-    "PRESS ANY KEY",
-  ];
-  function finishBoot() { $("boot").remove(); document.removeEventListener("keydown", finishBoot, true); }
-  render();
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches || store.get("nhlmodel.booted") === "1") {
-    finishBoot();
-  } else {
-    store.set("nhlmodel.booted", "1");
-    document.addEventListener("keydown", finishBoot, true);
-    $("boot").addEventListener("click", finishBoot);
-    let i = 0;
-    const tick = () => {
-      if (!document.getElementById("boot")) return;
-      $("boot-text").textContent = bootLines.slice(0, ++i).join("\n");
-      if (i < bootLines.length) setTimeout(tick, 140); else setTimeout(() => document.getElementById("boot") && finishBoot(), 1400);
-    };
-    tick();
+  // ---------- overview ----------
+  function renderProgress() {
+    const width = $("progress").getBoundingClientRect().width;
+    const n = Math.max(12, Math.min(60, Math.floor(width / 8.2)));   // ascii cells that fit the card
+    $("progress").innerHTML = [["Play-by-play", pbp], ["Shift charts", sh]].map(([k, c]) =>
+      `<div style="margin:6px 0 12px"><div class="prog-head"><span>${k}</span><span class="mono">${fmt(c)} / ${fmt(total)}</span></div>
+       <div class="prog" tabindex="0" data-tip="${esc(`${k}: ${fmt(c)} of ${fmt(total)} games (${pct(c / total)})`)}">${asciiBar(c / total, n)}</div></div>`).join("") +
+      `<div class="prog">goalie data (bulk): <span class="fl">complete</span>, all ${S.length} seasons</div>`;
   }
+  renderProgress();
+  addEventListener("resize", renderProgress);
+  const PH = [["0", "Data discovery", "done"], ["1", "Dataset and features", "wip"], ["2", "Baselines", "todo"],
+              ["3", "Model families", "todo"], ["4", "Experiments", "todo"], ["5", "Market backtest", "deferred"]];
+  const ico = { done: ["[x]", "done", "done"], wip: ["[~]", "wip", "in progress"], todo: ["[ ]", "", "not started"], deferred: ["[-]", "", "deferred: no odds"] };
+  $("phases").innerHTML = PH.map(([n, name, st]) =>
+    `<li><span class="ph-ico ${ico[st][1]}">${ico[st][0]}</span><span>Phase ${n} &middot; ${esc(name)}</span><span class="chip">${ico[st][2]}</span></li>`).join("");
+
+  // ---------- data quality table (sortable) ----------
+  const dl = (s) => Math.min(s.pbp_downloaded, s.shifts_downloaded) / s.games;
+  const COLS = [
+    ["Season", (s) => s.season, (s) => esc(s.label)],
+    ["Games", (s) => s.games, (s) => fmt(s.games)],
+    ["Downloaded", dl, (s) => { const k = Math.round(dl(s) * 10); return `<span class="mini">${"#".repeat(k)}${".".repeat(10 - k)}</span>${pct(dl(s), 0)}`; }],
+    ["Goals", (s) => s.goals_match, (s) => (s.processed ? pct(s.goals_match) : null)],
+    ["Starters", (s) => s.two_starters, (s) => (s.processed ? pct(s.two_starters) : null)],
+    ["Shift flags", (s) => s.shifts_flagged, (s) => (s.processed ? (s.shifts_flagged ? `<span class="flag">${s.shifts_flagged}</span>` : "0") : null)],
+    ["Shots w/ xy per game", (s) => s.shots_xy_per_game, (s) => (s.processed ? s.shots_xy_per_game.toFixed(1) : null)],
+    ["Home win %", (s) => s.home_win_rate, (s) => pct(s.home_win_rate)],
+  ];
+  let sortCol = 0, sortDir = -1;
+  function renderTable() {
+    const key = COLS[sortCol][1];
+    // seasons without a value (not processed yet) always sort last, whichever direction
+    const rows = S.slice().sort((a, b) => {
+      const x = key(a), y = key(b);
+      if (x == null || y == null) return (x == null) - (y == null);
+      return (x - y) * sortDir;
+    });
+    $("dq").innerHTML =
+      `<caption class="sr">Data quality by season</caption><thead><tr>${COLS.map(([h], i) =>
+        `<th scope="col" aria-sort="${i === sortCol ? (sortDir > 0 ? "ascending" : "descending") : "none"}"><button type="button" data-sort="${i}">${esc(h)}</button></th>`).join("")}</tr></thead>` +
+      `<tbody>${rows.map((s) => `<tr>${COLS.map(([, , f]) => { const v = f(s); return v == null ? `<td class="pending">pending</td>` : `<td>${v}</td>`; }).join("")}</tr>`).join("")}</tbody>`;
+  }
+  $("dq").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-sort]"); if (!b) return;
+    const i = +b.dataset.sort; sortDir = i === sortCol ? -sortDir : -1; sortCol = i; renderTable();  // first click: largest first
+  });
+  renderTable();
+
+  // ---------- empty states ----------
+  function empty(title, body) {
+    return `<div class="empty"><pre aria-hidden="true" class="spin">  .-=-.\n /  #  \\\n|  ===  |\n \\  :  /\n  '-=-'</pre>` +
+      `<div><h3>${esc(title)}</h3><p>${esc(body)} Nothing is shown here until real results exist.</p></div></div>`;
+  }
+
+  // ---------- xG chart ----------
+  const SERIES = [["xG model", "xg", "--s1", "#"], ["Distance + angle", "distance", "--s2", "="], ["Constant rate", "constant", "--s3", ":"]];
+  if (D.xg) {
+    $("xg-sub").innerHTML = `Log loss per shot on each <b>held-out season</b>; the model for each season is trained only on earlier seasons. ` +
+      `Lower is better; bars start at zero. <span class="chip">split: held-out season, trained on earlier seasons only</span>`;
+    const max = Math.max(...D.xg.rows.flatMap((r) => SERIES.map(([, k]) => r[k])));
+    const legend = `<div class="legend">${SERIES.map(([n, , c, g]) => `<span><span class="sw" style="--c:var(${c})">${g}</span>${esc(n)}</span>`).join("")}</div>`;
+    const groups = D.xg.rows.slice().reverse().map((r) =>
+      `<div class="season-group"><div class="season-head"><b>Held-out ${esc(r.label)}</b><span>trained on ${esc(r.train)}</span>` +
+      `<span>${fmt(r.n_test)} shots</span><span class="chip" tabindex="0" data-tip="Sum of predicted xG divided by actual goals in ${esc(r.label)}. 1.000 means calibrated in total.">total xG / goals ${r.xg_over_goals.toFixed(3)}</span></div>` +
+      SERIES.map(([n, k, c, g]) =>
+        `<div class="bar-row" tabindex="0" data-tip="${esc(`${n}\nheld-out ${r.label}: log loss ${r[k].toFixed(4)}\n${fmt(r.n_test)} shots`)}">` +
+        `<span class="lab">${esc(n)}</span><span class="bar-track"><span class="bar-fill" style="--c:var(${c})" data-w="${(100 * r[k] / max).toFixed(2)}" data-tex="${g.repeat(140)}"></span></span>` +
+        `<span class="val">${r[k].toFixed(4)}</span></div>`).join("") + "</div>").join("");
+    const table = `<details style="margin-top:12px"><summary style="cursor:pointer;color:var(--ink-2)">Table view</summary><div class="tbl-wrap"><table class="data" style="margin-top:8px">` +
+      `<thead><tr><th>Held-out season</th><th>Trained on</th><th>Shots</th><th>xG</th><th>Distance</th><th>Constant</th><th>xG / goals</th></tr></thead><tbody>${
+      D.xg.rows.map((r) => `<tr><td>${esc(r.label)}</td><td>${esc(r.train)}</td><td>${fmt(r.n_test)}</td><td>${r.xg.toFixed(4)}</td><td>${r.distance.toFixed(4)}</td><td>${r.constant.toFixed(4)}</td><td>${r.xg_over_goals.toFixed(3)}</td></tr>`).join("")}</tbody></table></div></details>`;
+    $("xg-card").innerHTML = legend + groups + table +
+      `<div style="margin-top:10px;font-size:13px;color:var(--muted)">source: results/xg_eval.csv, modified ${esc(D.xg.modified)}</div>`;
+    const grow = new IntersectionObserver((ents) => ents.forEach((en) => {
+      if (!en.isIntersecting) return;
+      en.target.querySelectorAll(".bar-fill").forEach((b, i) => setTimeout(() => { b.style.width = b.dataset.w + "%"; }, reduced ? 0 : i * 60));
+      grow.unobserve(en.target);
+    }), { threshold: .2 });
+    grow.observe($("xg-card"));
+  } else {
+    $("xg-sub").textContent = "Not evaluated yet.";
+    $("xg-card").innerHTML = empty("No xG evaluation found", "results/xg_eval.csv does not exist yet.");
+  }
+
+  $("exp-card").innerHTML = D.experiments ? "<p>Experiment table renderer arrives with Phase 2.</p>" : empty("No experiment results yet", "Phase 2 has not been run.");
+  $("games-card").innerHTML = empty("No held-out predictions yet", "The explorer needs Phase 2 predictions.");
+  $("calc-card").innerHTML = empty("No trained model yet", "The calculator needs Baseline B's exported coefficients.");
+  if (!reduced) {  // the empty-state glyph slowly cycles
+    const frames = ["#", "%", "*", "+", "="]; let f = 0;
+    setInterval(() => { f = (f + 1) % frames.length; document.querySelectorAll(".spin").forEach((p) => { p.textContent = p.textContent.replace(/(\/  )(.)(  \\)/, `$1${frames[f]}$3`); }); }, 420);
+  }
+
+  // ---------- scroll spy ----------
+  const links = [...document.querySelectorAll("#links a")];
+  const spy = new IntersectionObserver((ents) => ents.forEach((en) => {
+    if (en.isIntersecting) links.forEach((a) => a.setAttribute("aria-current", a.getAttribute("href") === "#" + en.target.id ? "true" : "false"));
+  }), { rootMargin: "-45% 0px -50% 0px" });
+  document.querySelectorAll("section.block").forEach((s) => spy.observe(s));
+
+  $("build").textContent = `built ${D.built_at} | rev ${D.git_rev}`;
 })();
 </script>
 </body>
