@@ -159,6 +159,19 @@ or exclude); Atlanta → Winnipeg (2011); Vegas expansion (2017-18); Seattle
 (2021-22); Arizona → Utah (2024-25). Teams will be keyed by franchise ID with a
 season-specific abbreviation map. Default: regular season only.
 
+## 3a. Free odds sources: terms checked (2026-10-18)
+
+| Source | Coverage (verified) | Terms (verified) | Usable? |
+|---|---|---|---|
+| SportsbookReviewsOnline archive | NHL 2007-08 → 2022-23, opening/closing moneylines; "will not be updated" | robots.txt allows the archive, but /terms/ says: *"You may not use or reproduce any content or materials on our website without our express written consent."* | **Not without written consent** |
+| Kaggle `michaelmallari/sportsbook-odds-on-nhl-games` | 2021-22 and 2022-23 only (2 CSVs, ~69 KB each) | Labeled MIT, but no stated source; appears to re-host SBR data. An uploader's license can't grant rights they don't hold | **Doubtful provenance**; not relied on |
+| Princeton DSS Historical Sports Odds Database | 2008–2023 per catalog | Page is behind a bot check ("Verify You Are Human"), which we don't circumvent; access likely limited to Princeton affiliates | Manual inquiry only |
+| NHL `partner-game` endpoint | Current games only | NHL's own public API; same personal, non-commercial basis as the rest of the NHL data | Free path, forward collection only |
+
+Conclusion: there is no free historical closing-line source with clean terms. The odds loader
+stays source-agnostic, so a file the user is entitled to use (e.g. after SBR grants
+consent) can be dropped in later.
+
 ## 3. Historical odds — candidate sources
 
 | Source | Coverage | Fields | Access / licensing concerns |
