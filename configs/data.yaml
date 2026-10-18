@@ -1,0 +1,20 @@
+# Data ingestion config. Paths are relative to the repo root.
+raw_dir: data/raw
+processed_dir: data/processed
+
+http:
+  user_agent: "nhlmodel-research/0.1 (personal, non-commercial research)"
+  min_interval_s: 1.0      # politeness: at most ~1 request/second per host
+  timeout_s: 30
+  max_retries: 4           # on 429 / 5xx / connection errors, exponential backoff
+  backoff_base_s: 2.0
+
+seasons:
+  first: 20102011          # first season with play-by-play shot coordinates (verified in Phase 0)
+  last: 20252026           # last completed season
+  game_types: [2]          # 2 = regular season only (decision: playoffs excluded)
+
+flags:
+  # Seasons kept in the data but flagged so evaluation can be reported with and without them.
+  no_fans: [20202021]
+  shortened: [20122013, 20192020, 20202021]
