@@ -1,7 +1,12 @@
 """Ingestion entry points.
 
     python -m nhlmodel.ingest.cli schedule            # build data/processed/games.parquet
-    python -m nhlmodel.ingest.cli games --what pbp boxscore shifts [--season 20232024] [--limit N]
+    python -m nhlmodel.ingest.cli goalies                         # one request per season
+    python -m nhlmodel.ingest.cli games --what pbp     [--season 20232024] [--limit N]
+    python -m nhlmodel.ingest.cli games --what shifts  (run alongside: different host)
+
+Per-game downloads go newest season first. Boxscores are optional (--what boxscore):
+goalie starts come from the bulk goalie endpoint and skater TOI from shift charts.
 
 All fetches go through the write-once raw cache, so every command is resumable
 and re-running it costs no network calls for data already downloaded.
@@ -47,7 +52,7 @@ def cmd_games(cfg, client: CachedClient, what: list[str], season: int | None, li
     games = pd.read_parquet(repo_path(cfg["processed_dir"]) / "games.parquet")
     if season:
         games = games[games["season"] == season]
-    ids = games["game_id"].tolist()[:limit]
+    ids = games.sort_values("start_time_utc", ascending=False)["game_id"].tolist()[:limit]
     todo = [(w, g) for g in ids for w in what if not client.is_cached(f"{CACHE_PREFIX[w]}/{g // 1000000}/{g}")]
     print(f"{len(ids)} games x {what}: {len(todo)} fetches needed")
     t0, missing = time.time(), 0
@@ -61,13 +66,21 @@ def cmd_games(cfg, client: CachedClient, what: list[str], season: int | None, li
             print(f"  {i}/{len(todo)}  404s={missing}  {rate:.2f} req/s  eta={(len(todo) - i) / rate / 3600:.1f}h", flush=True)
 
 
+def cmd_goalies(cfg, client: CachedClient) -> None:
+    for s in _seasons(cfg):
+        for gt in cfg["seasons"]["game_types"]:
+            rows = nhl.goalie_games(client, s, gt)
+            print(f"{s}: {len(rows)} goalie-games, {len({r['gameId'] for r in rows})} games", flush=True)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/data.yaml")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("schedule")
+    sub.add_parser("goalies")
     g = sub.add_parser("games")
-    g.add_argument("--what", nargs="+", choices=sorted(FETCHERS), default=sorted(FETCHERS))
+    g.add_argument("--what", nargs="+", choices=sorted(FETCHERS), default=["pbp", "shifts"])
     g.add_argument("--season", type=int)
     g.add_argument("--limit", type=int, help="only the first N games (smoke test)")
     args = ap.parse_args(argv)
@@ -76,6 +89,8 @@ def main(argv: list[str] | None = None) -> int:
     client = CachedClient.from_config(cfg, repo_path(cfg["raw_dir"]))
     if args.cmd == "schedule":
         cmd_schedule(cfg, client)
+    elif args.cmd == "goalies":
+        cmd_goalies(cfg, client)
     else:
         cmd_games(cfg, client, args.what, args.season, args.limit)
     return 0

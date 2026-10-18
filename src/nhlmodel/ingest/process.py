@@ -1,12 +1,15 @@
 """Build per-season processed tables from the raw cache, with integrity checks.
 
-    python -m nhlmodel.ingest.process [--season 20232024]
+    python -m nhlmodel.ingest.process [--season 20232024] [--allow-partial]
 
 Writes data/processed/<table>/<season>.parquet for tables
-events, skater_games, goalie_games, shifts, and a per-season quality report
-(data/processed/quality/<season>.parquet) listing, for every game, which raw
-documents were present and whether play-by-play goals match the final score.
-A season is processed only when all of its raw documents are downloaded,
+    events        every play-by-play event
+    rosters       players listed per game (with position)
+    shifts        on-ice shifts
+    skater_toi    time on ice per player-game, summed from shifts
+    goalie_games  goalie appearances incl. starter flag (bulk stats endpoint)
+    quality       per game: raw coverage, pbp goals vs final score, starter count
+A season is written only when all of its per-game raw documents are downloaded,
 unless --allow-partial is given.
 """
 from __future__ import annotations
@@ -20,23 +23,36 @@ from pathlib import Path
 import pandas as pd
 
 from ..config import load_config, repo_path
-from .parse import parse_boxscore, parse_pbp, parse_shifts
+from .parse import parse_goalie_games, parse_pbp, parse_roster, parse_shifts
 
-RAW = {"pbp": "nhl_web/pbp", "boxscore": "nhl_web/boxscore", "shifts": "nhl_stats/shifts"}
+RAW = {"pbp": "nhl_web/pbp", "shifts": "nhl_stats/shifts"}
+
+
+def _read(path: Path):
+    return json.loads(gzip.decompress(path.read_bytes()))
 
 
 def _load(raw_dir: Path, kind: str, gid: int):
     p = raw_dir / RAW[kind] / str(gid // 1000000) / f"{gid}.json.gz"
     if p.exists():
-        return json.loads(gzip.decompress(p.read_bytes()))
+        return _read(p)
     if p.with_name(f"{gid}.404").exists():
         return "404"
     return None
 
 
+def _pbp_goals_match(ev: list[dict], g) -> bool:
+    # Shootout "goals" don't count individually; the shootout winner is credited one goal.
+    hg = sum(1 for e in ev if e["type"] == "goal" and e["period_type"] != "SO" and e["is_home_event"] is True)
+    ag = sum(1 for e in ev if e["type"] == "goal" and e["period_type"] != "SO" and e["is_home_event"] is False)
+    if g.decided_in == "SO":
+        hg, ag = hg + (g.home_win == 1), ag + (g.home_win == 0)
+    return (hg, ag) == (g.home_score, g.away_score)
+
+
 def process_season(raw_dir: Path, out_dir: Path, games: pd.DataFrame, allow_partial: bool = False) -> pd.DataFrame:
     season = int(games["season"].iloc[0])
-    events, skaters, goalies, shifts, quality = [], [], [], [], []
+    events, rosters, shifts, quality = [], [], [], []
     for g in games.itertuples():
         docs = {k: _load(raw_dir, k, g.game_id) for k in RAW}
         q = {"game_id": g.game_id, **{f"has_{k}": isinstance(v, dict) for k, v in docs.items()}}
@@ -44,18 +60,11 @@ def process_season(raw_dir: Path, out_dir: Path, games: pd.DataFrame, allow_part
         if isinstance(docs["pbp"], dict):
             ev = parse_pbp(docs["pbp"])
             events.extend(ev)
-            # Shootout "goals" don't count toward the score; the shootout winner gets +1.
-            hg = sum(1 for e in ev if e["type"] == "goal" and e["period_type"] != "SO" and e["is_home_event"])
-            ag = sum(1 for e in ev if e["type"] == "goal" and e["period_type"] != "SO" and e["is_home_event"] is False)
-            so = g.decided_in == "SO"
-            q["pbp_goals_match"] = (hg + (so and g.home_win == 1), ag + (so and g.home_win == 0)) == (
-                g.home_score, g.away_score)
-            q["n_shots_xy"] = sum(1 for e in ev if e["type"] in ("shot-on-goal", "missed-shot", "goal") and e["x"] is not None)
-        if isinstance(docs["boxscore"], dict):
-            s, gl = parse_boxscore(docs["boxscore"])
-            skaters.extend(s)
-            goalies.extend(gl)
-            q["n_starters"] = sum(1 for r in gl if r["starter"])
+            rosters.extend(parse_roster(docs["pbp"]))
+            q["pbp_goals_match"] = _pbp_goals_match(ev, g)
+            q["n_unblocked_with_xy"] = sum(
+                1 for e in ev if e["type"] in ("shot-on-goal", "missed-shot", "goal") and e["x"] is not None
+            )
         if isinstance(docs["shifts"], dict):
             sh = parse_shifts(docs["shifts"])
             shifts.extend(sh)
@@ -66,12 +75,40 @@ def process_season(raw_dir: Path, out_dir: Path, games: pd.DataFrame, allow_part
     if (qdf["missing"] != "").any() and not allow_partial:
         n = int((qdf["missing"] != "").sum())
         raise RuntimeError(f"{season}: {n} games have raw documents not yet downloaded")
-    for name, rows in [("events", events), ("skater_games", skaters), ("goalie_games", goalies),
-                       ("shifts", shifts), ("quality", quality)]:
+
+    goalie_path = raw_dir / "nhl_stats" / "goalie_games" / f"{season}_2.json.gz"
+    ids = {r.game_id: (r.home_team_id, r.away_team_id) for r in games.itertuples()}
+    goalies = parse_goalie_games(_read(goalie_path)["data"], ids) if goalie_path.exists() else []
+    starters = pd.Series([r["game_id"] for r in goalies if r["starter"]]).value_counts()
+    qdf["n_starters"] = qdf["game_id"].map(starters).fillna(0).astype(int)
+
+    shifts_df = pd.DataFrame(shifts)
+    toi = (
+        shifts_df.groupby(["game_id", "team_id", "player_id"], as_index=False)["duration_s"].sum()
+        .rename(columns={"duration_s": "toi_s"})
+        if len(shifts_df) else pd.DataFrame()
+    )
+    tables = {"events": pd.DataFrame(events), "rosters": pd.DataFrame(rosters), "shifts": shifts_df,
+              "skater_toi": toi, "goalie_games": pd.DataFrame(goalies), "quality": qdf}
+    for name, df in tables.items():
         d = out_dir / name
         d.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame(rows).convert_dtypes().to_parquet(d / f"{season}.parquet", index=False)
+        df.convert_dtypes().to_parquet(d / f"{season}.parquet", index=False)
     return qdf
+
+
+def summarize(season: int, q: pd.DataFrame) -> str:
+    def rate(col, cond=None):
+        if col not in q:
+            return float("nan")
+        s = q[col] if cond is None else cond(q[col])
+        return float(s.mean())
+
+    return (
+        f"{season}: games={len(q)} pbp={rate('has_pbp'):.3f} shifts={rate('has_shifts'):.3f} "
+        f"goals_match={rate('pbp_goals_match'):.3f} two_starters={rate('n_starters', lambda s: s == 2):.3f} "
+        f"xy_shots/game={q['n_unblocked_with_xy'].mean() if 'n_unblocked_with_xy' in q else float('nan'):.1f}"
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -86,12 +123,7 @@ def main(argv: list[str] | None = None) -> int:
     seasons = [args.season] if args.season else sorted(games["season"].unique())
     for s in seasons:
         q = process_season(raw_dir, out_dir, games[games["season"] == s], args.allow_partial)
-        print(
-            f"{s}: games={len(q)} pbp={q.has_pbp.mean():.3f} box={q.has_boxscore.mean():.3f} "
-            f"shifts={q.has_shifts.mean():.3f} goals_match={q.get('pbp_goals_match', pd.Series(dtype=bool)).mean():.3f} "
-            f"two_starters={(q.get('n_starters', pd.Series(dtype=float)) == 2).mean():.3f}",
-            flush=True,
-        )
+        print(summarize(s, q), flush=True)
     return 0
 
 

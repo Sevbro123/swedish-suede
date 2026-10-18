@@ -1,4 +1,6 @@
-from nhlmodel.ingest.parse import mmss, parse_boxscore, parse_pbp, parse_shifts, situation
+from nhlmodel.ingest.parse import (
+    mmss, parse_boxscore, parse_goalie_games, parse_pbp, parse_roster, parse_shifts, situation,
+)
 
 HOME, AWAY = 7, 30
 
@@ -89,3 +91,19 @@ def test_shifts_skip_goal_marker_rows():
     ]}
     rows = parse_shifts(doc)
     assert len(rows) == 1 and (rows[0]["start_s"], rows[0]["end_s"]) == (0, 34)
+
+
+def test_roster_marks_home_players():
+    rows = parse_roster(pbp_doc([]))
+    assert {(r["player_id"], r["is_home"]) for r in rows} == {(1, True), (2, False)}
+
+
+def test_bulk_goalie_rows_map_to_team_ids_and_skip_unknown_games():
+    rows = [
+        {"gameId": 100, "playerId": 11, "homeRoad": "H", "gamesStarted": 1, "timeOnIce": 3600, "shotsAgainst": 30,
+         "saves": 28, "goalsAgainst": 2},
+        {"gameId": 100, "playerId": 21, "homeRoad": "R", "gamesStarted": 0, "timeOnIce": 1200},
+        {"gameId": 999, "playerId": 31, "homeRoad": "H", "gamesStarted": 1},
+    ]
+    out = parse_goalie_games(rows, {100: (HOME, AWAY)})
+    assert [(r["player_id"], r["team_id"], r["starter"]) for r in out] == [(11, HOME, True), (21, AWAY, False)]

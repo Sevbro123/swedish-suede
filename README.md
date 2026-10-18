@@ -34,8 +34,22 @@ Python 3.13. Exact versions are pinned in `requirements.lock`.
 
 ```bash
 # Phase 1: ingestion (resumable; cached responses are never re-fetched)
-python -m nhlmodel.ingest.cli schedule                         # -> data/processed/games.parquet
-python -m nhlmodel.ingest.cli games --what pbp boxscore shifts # raw per-game JSON
+python -m nhlmodel.ingest.cli schedule              # -> data/processed/games.parquet (~430 requests)
+python -m nhlmodel.ingest.cli goalies               # goalie-games incl. starter flag (1 request/season)
+python -m nhlmodel.ingest.cli games --what pbp &    # play-by-play, newest season first
+python -m nhlmodel.ingest.cli games --what shifts   # shift charts (other host, so run in parallel)
+python -m nhlmodel.ingest.process                   # -> data/processed/<table>/<season>.parquet
+scripts/publish_processed.sh "msg"                  # push processed tables to the `data` branch
+```
+
+Each host is limited to 1 request/second, so the full backfill (~19k games × 2 documents)
+takes ~5.3 h with both downloads running.
+
+**Skip the download:** processed tables live on the `data` branch:
+
+```bash
+git fetch origin data
+git archive origin/data processed | tar -x --strip-components=1 -C data/processed
 ```
 
 ## Layout

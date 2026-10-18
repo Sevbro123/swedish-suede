@@ -82,6 +82,45 @@ def parse_pbp(doc: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
+def parse_roster(doc: dict[str, Any]) -> list[dict[str, Any]]:
+    """Players listed for the game in play-by-play rosterSpots (both teams)."""
+    home_id = doc["homeTeam"]["id"]
+    return [
+        {
+            "game_id": doc["id"],
+            "team_id": r["teamId"],
+            "is_home": r["teamId"] == home_id,
+            "player_id": r["playerId"],
+            "position": r.get("positionCode"),
+        }
+        for r in doc.get("rosterSpots", [])
+    ]
+
+
+def parse_goalie_games(rows: list[dict[str, Any]], home_away_ids: dict[int, tuple[int, int]]) -> list[dict[str, Any]]:
+    """Bulk stats-API goalie-game rows -> goalie_games. ``home_away_ids`` maps game_id -> (home_id, away_id)."""
+    out = []
+    for r in rows:
+        gid = r["gameId"]
+        if gid not in home_away_ids:
+            continue
+        is_home = r["homeRoad"] == "H"
+        out.append(
+            {
+                "game_id": gid,
+                "team_id": home_away_ids[gid][0 if is_home else 1],
+                "is_home": is_home,
+                "player_id": r["playerId"],
+                "starter": r.get("gamesStarted") == 1,
+                "toi_s": r.get("timeOnIce"),
+                "shots_against": r.get("shotsAgainst"),
+                "saves": r.get("saves"),
+                "goals_against": r.get("goalsAgainst"),
+            }
+        )
+    return out
+
+
 def _saves_shots(s: str | None) -> tuple[int | None, int | None]:
     if not s or "/" not in s:
         return None, None
