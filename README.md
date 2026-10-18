@@ -51,7 +51,9 @@ takes ~5.3 h with both downloads running.
 python -m nhlmodel.report serve        # builds site/index.html, serves http://127.0.0.1:8000/
 ```
 
-`site/index.html` is self-contained, so it can also be opened directly without the server.
+`site/index.html` is self-contained, so it can also be opened directly without the server. It plays like a
+game menu: arrow keys / Enter / Esc (or mouse and touch). Areas without real results stay locked
+and open themselves once those results exist; Settings has the light theme and an effects switch.
 
 **Skip the download:** processed tables live on the `data` branch:
 
