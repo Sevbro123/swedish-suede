@@ -9,7 +9,7 @@ def ev(**over):
     row = dict(game_id=2023020001, event_id=1, sort_order=1, period=1, period_type="REG", t_game_s=100,
                type="shot-on-goal", situation_code="1551", away_goalie_in=1, away_skaters=5, home_skaters=5,
                home_goalie_in=1, home_defending_side="left", event_team_id=7, is_home_event=True, x=80.0, y=5.0,
-               zone_code="O", shot_type="wrist")
+               zone_code="O", shot_type="wrist", goalie_id=99)
     row.update(over)
     return row
 
