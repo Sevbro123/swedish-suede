@@ -50,6 +50,34 @@ def _pbp_goals_match(ev: list[dict], g) -> bool:
     return (hg, ag) == (g.home_score, g.away_score)
 
 
+# Summed on-ice time per team (skaters + goalie), minutes: ~6 x 60 in regulation, a bit more with OT.
+# Outside this range the shift chart is treated as unreliable for that game.
+TEAM_TOI_RANGE_MIN = (320, 420)
+
+
+def clean_shifts(rows: list[dict], home_id: int, away_id: int) -> tuple[list[dict], dict]:
+    """Drop shifts for teams not in the game and exact duplicate rows (both seen in NHL shift charts),
+    then flag the game if either team's summed TOI is still implausible."""
+    keep, seen = [], set()
+    for r in rows:
+        key = (r["player_id"], r["period"], r["start_s"], r["end_s"])
+        if r["team_id"] in (home_id, away_id) and key not in seen:
+            seen.add(key)
+            keep.append(r)
+    toi = {home_id: 0, away_id: 0}
+    for r in keep:
+        toi[r["team_id"]] += r["duration_s"] or 0
+    lo, hi = TEAM_TOI_RANGE_MIN
+    info = {
+        "n_shifts": len(keep),
+        "n_shifts_dropped": len(rows) - len(keep),
+        "home_toi_min": toi[home_id] / 60,
+        "away_toi_min": toi[away_id] / 60,
+    }
+    info["shifts_ok"] = all(lo <= v / 60 <= hi for v in toi.values())
+    return keep, info
+
+
 def process_season(raw_dir: Path, out_dir: Path, games: pd.DataFrame, allow_partial: bool = False) -> pd.DataFrame:
     season = int(games["season"].iloc[0])
     events, rosters, shifts, quality = [], [], [], []
@@ -66,9 +94,9 @@ def process_season(raw_dir: Path, out_dir: Path, games: pd.DataFrame, allow_part
                 1 for e in ev if e["type"] in ("shot-on-goal", "missed-shot", "goal") and e["x"] is not None
             )
         if isinstance(docs["shifts"], dict):
-            sh = parse_shifts(docs["shifts"])
+            sh, info = clean_shifts(parse_shifts(docs["shifts"]), g.home_team_id, g.away_team_id)
             shifts.extend(sh)
-            q["n_shifts"] = len(sh)
+            q.update(info)
         quality.append(q)
 
     qdf = pd.DataFrame(quality)
@@ -107,7 +135,7 @@ def summarize(season: int, q: pd.DataFrame) -> str:
     return (
         f"{season}: games={len(q)} pbp={rate('has_pbp'):.3f} shifts={rate('has_shifts'):.3f} "
         f"goals_match={rate('pbp_goals_match'):.3f} two_starters={rate('n_starters', lambda s: s == 2):.3f} "
-        f"xy_shots/game={q['n_unblocked_with_xy'].mean() if 'n_unblocked_with_xy' in q else float('nan'):.1f}"
+        f"shifts_ok={rate('shifts_ok'):.3f} xy_shots/game={q['n_unblocked_with_xy'].mean() if 'n_unblocked_with_xy' in q else float('nan'):.1f}"
     )
 
 

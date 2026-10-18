@@ -107,3 +107,19 @@ def test_bulk_goalie_rows_map_to_team_ids_and_skip_unknown_games():
     ]
     out = parse_goalie_games(rows, {100: (HOME, AWAY)})
     assert [(r["player_id"], r["team_id"], r["starter"]) for r in out] == [(11, HOME, True), (21, AWAY, False)]
+
+
+def test_clean_shifts_drops_foreign_teams_and_duplicates_and_flags_bad_toi():
+    from nhlmodel.ingest.process import clean_shifts
+
+    def sh(team, pid, start, end):
+        return {"game_id": 1, "player_id": pid, "team_id": team, "period": 1, "start_s": start, "end_s": end,
+                "duration_s": end - start}
+
+    rows = [sh(HOME, 1, 0, 40), sh(HOME, 1, 0, 40), sh(AWAY, 2, 0, 40), sh(99, 3, 0, 40)]
+    keep, info = clean_shifts(rows, HOME, AWAY)
+    assert len(keep) == 2 and info["n_shifts_dropped"] == 2
+    assert info["shifts_ok"] is False  # 40 s of TOI per team is far below a full game
+
+    full = [sh(t, 100 * t + p, 0, 3600) for t in (HOME, AWAY) for p in range(6)]
+    assert clean_shifts(full, HOME, AWAY)[1]["shifts_ok"] is True
