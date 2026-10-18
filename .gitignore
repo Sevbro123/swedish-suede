@@ -8,3 +8,4 @@ data/processed/
 !data/processed/.gitkeep
 results/runs/
 *.egg-info/
+site/

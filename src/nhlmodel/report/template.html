@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230a0f0a'/%3E%3Crect x='3' y='11' width='7' height='2' fill='%2333ff66'/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NHLMODEL Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0f0a; --ink: #33ff66; --dim: #1f9e45; --glow: rgba(51,255,102,.35); --sel-bg: #33ff66; --sel-ink: #0a0f0a;
+    --scan: rgba(0,0,0,.28); --vignette: rgba(0,0,0,.55);
+  }
+  :root[data-theme="amber"] {
+    --bg: #0f0a03; --ink: #ffb000; --dim: #b07a00; --glow: rgba(255,176,0,.33); --sel-bg: #ffb000; --sel-ink: #0f0a03;
+  }
+  :root[data-theme="paper"] {
+    --bg: #f4f1e6; --ink: #1d4d2b; --dim: #3f6a50; --glow: transparent; --sel-bg: #1d4d2b; --sel-ink: #f4f1e6;
+    --scan: rgba(29,77,43,.06); --vignette: transparent;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme]) {
+      --bg: #f4f1e6; --ink: #1d4d2b; --dim: #3f6a50; --glow: transparent; --sel-bg: #1d4d2b; --sel-ink: #f4f1e6;
+      --scan: rgba(29,77,43,.06); --vignette: transparent;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 21px/1.15 "VT323", "Courier New", ui-monospace, monospace;
+    text-shadow: 0 0 6px var(--glow);
+    font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0;  /* ligatures break the column grid */
+    overflow-x: hidden;
+  }
+  .crt { position: relative; min-height: 100%; padding: 16px; max-width: 1180px; margin: 0 auto; }
+  .crt::before {  /* scanlines */
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 5;
+    background: repeating-linear-gradient(to bottom, transparent 0 2px, var(--scan) 2px 3px);
+  }
+  .crt::after {   /* tube vignette */
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 6;
+    background: radial-gradient(ellipse at center, transparent 60%, var(--vignette) 100%);
+  }
+  body.no-scan .crt::before, body.no-scan .crt::after { display: none; }
+  pre { margin: 0; font: inherit; white-space: pre; }
+  #footer { white-space: pre-wrap; }
+  .dim { color: var(--dim); }
+  nav { display: flex; flex-wrap: wrap; gap: 0 1ch; margin: .5em 0 .75em; }
+  nav button {
+    font: inherit; color: var(--ink); background: none; border: 0; padding: 0; cursor: pointer; text-shadow: inherit;
+  }
+  nav button[aria-selected="true"] { background: var(--sel-bg); color: var(--sel-ink); text-shadow: none; }
+  nav button:focus-visible, .row:focus-visible, .key:focus-visible { outline: 1px dashed var(--ink); outline-offset: 2px; }
+  #screen { min-height: 60vh; }
+  .row { display: inline; cursor: default; }
+  .row:hover, .row:focus { background: color-mix(in srgb, var(--ink) 14%, transparent); outline: none; }
+  .cursor { display: inline-block; width: 1ch; background: var(--ink); animation: blink 1.06s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  #tip {
+    position: fixed; z-index: 10; pointer-events: none; display: none; max-width: min(46ch, 90vw);
+    background: var(--bg); color: var(--ink); border: 1px solid var(--ink); padding: 4px 8px; white-space: pre-wrap;
+  }
+  #boot { position: fixed; inset: 0; z-index: 20; background: var(--bg); padding: 16px; overflow: hidden; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .key { font: inherit; color: var(--ink); background: none; border: 0; padding: 0; cursor: pointer; text-shadow: inherit; text-decoration: underline; }
+  @media (prefers-reduced-motion: reduce) { .cursor { animation: none; } }
+</style>
+</head>
+<body>
+<div id="boot" aria-hidden="true"><pre id="boot-text"></pre></div>
+<main class="crt">
+  <pre id="banner" aria-label="NHLMODEL terminal"></pre>
+  <nav role="tablist" aria-label="Sections" id="nav"></nav>
+  <section id="screen" aria-live="polite"></section>
+  <pre id="footer" class="dim"></pre>
+</main>
+<div id="tip" role="tooltip"></div>
+<script id="payload" type="application/json">/*__DATA__*/null</script>
+<script>
+(() => {
+  const D = JSON.parse(document.getElementById("payload").textContent);
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch { /* storage unavailable */ } },
+  };
+
+  // ---------- geometry: how many monospace columns fit ----------
+  let COLS = 80;
+  function measure() {
+    const probe = document.createElement("pre");
+    probe.style.cssText = "position:absolute;visibility:hidden";
+    probe.textContent = "M".repeat(100);
+    document.body.appendChild(probe);
+    const cw = probe.getBoundingClientRect().width / 100;
+    probe.remove();
+    const avail = $("screen").getBoundingClientRect().width || window.innerWidth - 32;
+    COLS = Math.max(34, Math.min(110, Math.floor(avail / cw)));
+  }
+
+  // ---------- ASCII primitives ----------
+  const pad = (s, n, right = false) => { s = String(s); return s.length >= n ? s.slice(0, n) : right ? " ".repeat(n - s.length) + s : s + " ".repeat(n - s.length); };
+  // Pure 7-bit ASCII only: box-drawing/block glyphs come from fallback fonts with different
+  // advance widths and break column alignment.
+  function boxTop(title, w) { const t = title ? `[ ${title} ]` : ""; return "+=" + t + "=".repeat(Math.max(0, w - 3 - t.length)) + "+"; }
+  const boxBot = (w) => "+" + "=".repeat(w - 2) + "+";
+  const boxLine = (s, w) => "| " + pad(s, w - 4) + " |";
+  const rule = (w, ch = "-") => ch.repeat(w);
+  function bar(v, max, width, glyph = "#") {
+    if (v == null || !isFinite(v) || max <= 0) return pad("", width);
+    const n = Math.max(0, Math.min(width, Math.round((v / max) * width)));
+    return glyph.repeat(n) + ".".repeat(width - n);
+  }
+  const pct = (x) => (x == null ? "  -  " : (100 * x).toFixed(1) + "%");
+
+  // Wrap a prose line to the frame's inner width, keeping its indent on continuation lines.
+  function wrap(s, width) {
+    if (s.length <= width) return [s];
+    const indent = s.match(/^ */)[0], words = s.trim().split(/ +/), out = [];
+    let line = indent;
+    for (const w of words) {
+      if (line.trim() && (line + " " + w).length > width) { out.push(line); line = indent + "  " + w; }
+      else line = line.trim() ? line + " " + w : indent + w;
+    }
+    out.push(line);
+    return out;
+  }
+
+  // A frame whose body lines may carry hover/focus metadata.
+  // lines: string (prose, wrapped to fit) | {text, tip} (table rows, fitted by the caller)
+  function frame(title, lines) {
+    const w = COLS;
+    const out = [`<span aria-hidden="true">${esc(boxTop(title, w))}</span>`];
+    lines = lines.flatMap((l) => (typeof l === "string" ? wrap(l, w - 4) : [l]));
+    for (const l of lines) {
+      const text = typeof l === "string" ? l : l.text;
+      const body = esc(boxLine(text, w));
+      out.push(typeof l === "string" || !l.tip ? body
+        : `<span class="row" tabindex="0" data-tip="${esc(l.tip)}">${body}</span>`);
+    }
+    out.push(`<span aria-hidden="true">${esc(boxBot(w))}</span>`);
+    return `<pre>${out.join("\n")}</pre>`;
+  }
+  function srTable(caption, head, rows) {
+    return `<div class="sr"><table><caption>${esc(caption)}</caption><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${
+      rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+  }
+  const pending = (what, why) => frame(what, ["", `  NO DATA.  ${why}`, "", "  Nothing is shown here until real results exist.", ""]);
+
+  // ---------- screens ----------
+  const S = D.data.seasons;
+  const processed = S.filter((s) => s.processed);
+  const totalGames = D.data.total_games;
+  const pbpDone = S.reduce((a, s) => a + Math.min(s.pbp_downloaded, s.games), 0);
+  const shDone = S.reduce((a, s) => a + Math.min(s.shifts_downloaded, s.games), 0);
+
+  const screens = {
+    status() {
+      const bw = Math.max(10, COLS - 34);
+      const lines = [
+        "",
+        `  SEASONS IN GAMES TABLE ..... ${S.length}   (${S[0].label} -> ${S[S.length - 1].label})`,
+        `  REGULAR-SEASON GAMES ....... ${totalGames.toLocaleString()}`,
+        `  SEASONS PROCESSED .......... ${processed.length} / ${S.length}`,
+        "",
+        { text: `  PLAY-BY-PLAY  ${bar(pbpDone, totalGames, bw)} ${pad(pct(pbpDone / totalGames), 6, true)}`,
+          tip: `Play-by-play downloaded: ${pbpDone.toLocaleString()} of ${totalGames.toLocaleString()} games` },
+        { text: `  SHIFT CHARTS  ${bar(shDone, totalGames, bw)} ${pad(pct(shDone / totalGames), 6, true)}`,
+          tip: `Shift charts downloaded: ${shDone.toLocaleString()} of ${totalGames.toLocaleString()} games` },
+        "",
+      ];
+      const phases = [
+        ["0", "DATA DISCOVERY", "DONE"], ["1", "DATASET + FEATURES", "IN PROGRESS"], ["2", "BASELINES", "NOT STARTED"],
+        ["3", "MODEL FAMILIES", "NOT STARTED"], ["4", "EXPERIMENTS", "NOT STARTED"], ["5", "MARKET BACKTEST", "DEFERRED (NO ODDS)"],
+      ];
+      const ph = phases.map(([n, name, st]) => `  PHASE ${n}  ${pad(name, 22)} ${st === "DONE" ? "[X]" : st === "IN PROGRESS" ? "[~]" : "[ ]"} ${st}`);
+      return frame("SYSTEM STATUS", lines) + "\n" + frame("PHASES", ["", ...ph, ""]) +
+        srTable("Download progress", ["item", "done", "total"], [["play-by-play", pbpDone, totalGames], ["shift charts", shDone, totalGames]]);
+    },
+
+    data() {
+      const narrow = COLS < 70;
+      const head = narrow
+        ? ` ${pad("SEASON", 7)} ${pad("GAMES", 5, true)} ${pad("GOALS", 6, true)} ${pad("START", 6, true)} ${pad("FLAG", 4, true)}`
+        : `  ${pad("SEASON", 7)} ${pad("GAMES", 6, true)}  ${pad("DOWNLOADED", 19)}    ${pad("GOALS", 6, true)}  ${pad("STARTERS", 10, true)}  ${pad("SHIFT FLAGS", 11, true)}  ${pad("XY SHOTS/GP", 11, true)}`;
+      const bw = 12;
+      const rows = S.slice().reverse().map((s) => {
+        const dl = Math.min(s.pbp_downloaded, s.shifts_downloaded) / s.games;
+        const g = s.processed ? pad(pct(s.goals_match), 6, true) : "   ...";
+        const st = s.processed ? pad(pct(s.two_starters), 10, true) : pad("...", 10, true);
+        const fl = s.processed ? pad(s.shifts_flagged, 11, true) : pad("...", 11, true);
+        const xy = s.processed ? pad(s.shots_xy_per_game.toFixed(1), 11, true) : pad("...", 11, true);
+        const text = narrow
+          ? ` ${pad(s.label, 7)} ${pad(s.games, 5, true)} ${g} ${pad(s.processed ? pct(s.two_starters) : "...", 6, true)} ${pad(s.processed ? s.shifts_flagged : "...", 4, true)}`
+          : `  ${pad(s.label, 7)} ${pad(s.games, 6, true)}  ${bar(dl, 1, bw, "#")} ${pad(pct(dl), 6, true)}    ${g}  ${st}  ${fl}  ${xy}`;
+        const tip = `${s.label}: ${s.games} games, home win rate ${pct(s.home_win_rate)}\n` +
+          `downloaded: pbp ${s.pbp_downloaded}, shifts ${s.shifts_downloaded}\n` +
+          (s.processed ? `pbp goals = final score: ${pct(s.goals_match)}\nexactly 2 starters: ${pct(s.two_starters)}\nshift charts flagged: ${s.shifts_flagged}`
+            : "not processed yet");
+        return { text, tip };
+      });
+      const note = ["", "  GOALS: share of games where play-by-play goals equal the final score.",
+        "  STARTERS (START): share of games with exactly 2 starting goalies.",
+        "  FLAGS: shift charts failing the team time-on-ice check; features skip shift-based stats for those games.", ""];
+      return frame("DATA QUALITY BY SEASON", ["", head, "  " + rule(COLS - 8), ...rows, ...note]) +
+        srTable("Data quality by season", ["season", "games", "pbp downloaded", "shifts downloaded", "goals match", "two starters", "shift flags"],
+          S.map((s) => [s.label, s.games, s.pbp_downloaded, s.shifts_downloaded, s.processed ? s.goals_match : "", s.processed ? s.two_starters : "", s.processed ? s.shifts_flagged : ""]));
+    },
+
+    xg() {
+      if (!D.xg) return pending("EXPECTED GOALS", "results/xg_eval.csv not found.");
+      const R = D.xg.rows;
+      const max = Math.max(...R.flatMap((r) => [r.xg, r.distance, r.constant]));
+      const bw = Math.max(10, COLS - 36);
+      const series = [["XG MODEL", "xg", "#"], ["DISTANCE", "distance", "%"], ["CONSTANT", "constant", ":"]];
+      const lines = ["", `  SPLIT: ${D.xg.split}`, "  METRIC: log loss per shot (lower is better). Bars start at 0.", ""];
+      for (const r of R) {
+        lines.push(`  HELD-OUT ${r.label}   trained on ${r.train}   shots ${r.n_test.toLocaleString()}`);
+        for (const [name, k, gl] of series) {
+          lines.push({ text: `    ${pad(name, 9)} ${bar(r[k], max, bw, gl)} ${r[k].toFixed(4)}`,
+                       tip: `${name} on held-out ${r.label}\nlog loss ${r[k].toFixed(4)}\n(${r.n_test.toLocaleString()} shots)` });
+        }
+        lines.push({ text: `    TOTAL XG / GOALS  ${r.xg_over_goals.toFixed(3)}  (1.000 = calibrated in total)`,
+                     tip: `Sum of predicted xG divided by actual goals on held-out ${r.label}` });
+        lines.push("");
+      }
+      lines.push("  KEY:  # xG model   % distance+angle logistic   : constant goal rate", `  FILE MODIFIED ${D.xg.modified}`, "");
+      return frame("EXPECTED GOALS: HELD-OUT EVALUATION", lines) +
+        srTable("xG log loss by held-out season", ["held-out season", "trained on", "shots", "xG", "distance", "constant", "xG/goals"],
+          R.map((r) => [r.label, r.train, r.n_test, r.xg, r.distance, r.constant, r.xg_over_goals]));
+    },
+
+    experiments() {
+      return D.experiments ? frame("EXPERIMENTS", ["", "  (results table renderer arrives with Phase 2)", ""])
+        : pending("EXPERIMENTS", "Phase 2 has not been run.");
+    },
+    games() { return pending("GAME EXPLORER", "Needs held-out predictions (Phase 2)."); },
+    calc() { return pending("WHAT-IF CALCULATOR", "Needs a trained model (Baseline B)."); },
+  };
+  const TABS = [["1", "status", "STATUS"], ["2", "data", "DATA"], ["3", "xg", "XG"], ["4", "experiments", "EXPERIMENTS"],
+                ["5", "games", "GAMES"], ["6", "calc", "CALC"]];
+
+  // ---------- chrome ----------
+  const BANNER = [
+    " _   _ _   _ _     __  __  ___  ___  ___ _    ",
+    "| \\ | | | | | |   |  \\/  |/ _ \\|   \\| __| |   ",
+    "|  \\| | |_| | |__ | |\\/| | (_) | |) | _|| |__ ",
+    "|_|\\__|_| |_|____||_|  |_|\\___/|___/|___|____|",
+  ];
+  let current = store.get("nhlmodel.tab") || "status";
+  if (!screens[current]) current = "status";
+
+  function renderNav() {
+    $("nav").innerHTML = TABS.map(([k, id, label]) =>
+      `<button role="tab" id="tab-${id}" aria-selected="${id === current}" data-tab="${id}">[${k}] ${label}</button>`).join("");
+  }
+  function renderFooter() {
+    const theme = document.documentElement.dataset.theme || "auto";
+    $("footer").innerHTML = esc(rule(COLS, "-")) + "\n" +
+      esc(`BUILT ${D.built_at} | REV ${D.git_rev} | THEME ${theme.toUpperCase()}`) + "\n" +
+      `<button class="key" data-act="theme">[T]HEME</button> <button class="key" data-act="scan">[S]CANLINES</button> ` +
+      `<button class="key" data-act="help">[?]HELP</button>  &gt;<span class="cursor">&nbsp;</span>`;
+  }
+  function render() {
+    measure();
+    $("banner").textContent = COLS >= 50 ? BANNER.join("\n") : "NHLMODEL";
+    renderNav();
+    $("screen").innerHTML = screens[current]();
+    $("screen").setAttribute("aria-labelledby", `tab-${current}`);
+    renderFooter();
+  }
+  function go(id) { current = id; store.set("nhlmodel.tab", id); render(); }
+
+  const THEMES = ["green", "amber", "paper"];
+  function setTheme(t) { document.documentElement.dataset.theme = t; store.set("nhlmodel.theme", t); renderFooter(); }
+  const savedTheme = store.get("nhlmodel.theme");
+  if (THEMES.includes(savedTheme)) document.documentElement.dataset.theme = savedTheme;
+  if (store.get("nhlmodel.scan") === "off") document.body.classList.add("no-scan");
+  function cycleTheme() {
+    const cur = document.documentElement.dataset.theme ||
+      (matchMedia("(prefers-color-scheme: light)").matches ? "paper" : "green");
+    setTheme(THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length]);
+  }
+  function toggleScan() {
+    const off = document.body.classList.toggle("no-scan");
+    store.set("nhlmodel.scan", off ? "off" : "on");
+  }
+  function help() {
+    $("screen").innerHTML = frame("HELP", ["", "  1-6   switch section          T   cycle theme (green / amber / paper)",
+      "  S     scanlines on/off       ?   this help", "  Hover or Tab onto a row for details.", "",
+      "  Every number here is read from files on disk. Sections without", "  real results say NO DATA instead of showing placeholders.", ""]);
+  }
+
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest("[data-tab]"); if (t) return go(t.dataset.tab);
+    const a = e.target.closest("[data-act]"); if (!a) return;
+    ({ theme: cycleTheme, scan: toggleScan, help })[a.dataset.act]();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const tab = TABS.find(([k]) => k === e.key); if (tab) return go(tab[1]);
+    if (e.key === "t" || e.key === "T") cycleTheme();
+    else if (e.key === "s" || e.key === "S") toggleScan();
+    else if (e.key === "?") help();
+  });
+
+  // ---------- tooltips (hover + keyboard focus) ----------
+  const tip = $("tip");
+  function showTip(el, x, y) {
+    tip.textContent = el.dataset.tip; tip.style.display = "block";
+    const r = tip.getBoundingClientRect();
+    tip.style.left = Math.min(x + 14, innerWidth - r.width - 8) + "px";
+    tip.style.top = Math.min(y + 14, innerHeight - r.height - 8) + "px";
+  }
+  document.addEventListener("mousemove", (e) => {
+    const el = e.target.closest("[data-tip]"); if (el) showTip(el, e.clientX, e.clientY); else tip.style.display = "none";
+  });
+  document.addEventListener("focusin", (e) => {
+    const el = e.target.closest("[data-tip]"); if (!el) return;
+    const r = el.getBoundingClientRect(); showTip(el, r.left + 24, r.bottom);
+  });
+  document.addEventListener("focusout", () => { tip.style.display = "none"; });
+
+  let resizeT; addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(render, 120); });
+
+  // ---------- boot sequence ----------
+  const bootLines = [
+    "NHLMODEL BIOS v0.1  (c) research use only",
+    "",
+    "MEMORY TEST ........ 640K OK",
+    `GAMES TABLE ........ ${totalGames.toLocaleString()} RECORDS`,
+    `SEASONS PROCESSED .. ${processed.length}/${S.length}`,
+    `XG EVALUATION ...... ${D.xg ? D.xg.rows.length + " HELD-OUT SEASONS" : "NOT FOUND"}`,
+    "WAGERING MODULE .... NOT INSTALLED (BY DESIGN)",
+    "",
+    "PRESS ANY KEY",
+  ];
+  function finishBoot() { $("boot").remove(); document.removeEventListener("keydown", finishBoot, true); }
+  render();
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches || store.get("nhlmodel.booted") === "1") {
+    finishBoot();
+  } else {
+    store.set("nhlmodel.booted", "1");
+    document.addEventListener("keydown", finishBoot, true);
+    $("boot").addEventListener("click", finishBoot);
+    let i = 0;
+    const tick = () => {
+      if (!document.getElementById("boot")) return;
+      $("boot-text").textContent = bootLines.slice(0, ++i).join("\n");
+      if (i < bootLines.length) setTimeout(tick, 140); else setTimeout(() => document.getElementById("boot") && finishBoot(), 1400);
+    };
+    tick();
+  }
+})();
+</script>
+</body>
+</html>

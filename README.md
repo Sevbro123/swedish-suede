@@ -45,6 +45,14 @@ scripts/publish_processed.sh "msg"                  # push processed tables to t
 Each host is limited to 1 request/second, so the full backfill (~19k games × 2 documents)
 takes ~5.3 h with both downloads running.
 
+**Local front end** (retro terminal; shows only numbers read from files on disk):
+
+```bash
+python -m nhlmodel.report serve        # builds site/index.html, serves http://127.0.0.1:8000/
+```
+
+Keys: `1`-`6` sections, `T` theme (green / amber / paper), `S` scanlines, `?` help.
+
 **Skip the download:** processed tables live on the `data` branch:
 
 ```bash
