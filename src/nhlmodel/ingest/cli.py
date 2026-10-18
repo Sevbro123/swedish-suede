@@ -1,7 +1,7 @@
 """Ingestion entry points.
 
     python -m nhlmodel.ingest.cli schedule            # build data/processed/games.parquet
-    python -m nhlmodel.ingest.cli games --what pbp boxscore shifts [--season 20232024]
+    python -m nhlmodel.ingest.cli games --what pbp boxscore shifts [--season 20232024] [--limit N]
 
 All fetches go through the write-once raw cache, so every command is resumable
 and re-running it costs no network calls for data already downloaded.
@@ -43,11 +43,11 @@ def cmd_schedule(cfg, client: CachedClient) -> None:
     print(f"wrote {out} ({len(games)} games)")
 
 
-def cmd_games(cfg, client: CachedClient, what: list[str], season: int | None) -> None:
+def cmd_games(cfg, client: CachedClient, what: list[str], season: int | None, limit: int | None = None) -> None:
     games = pd.read_parquet(repo_path(cfg["processed_dir"]) / "games.parquet")
     if season:
         games = games[games["season"] == season]
-    ids = games["game_id"].tolist()
+    ids = games["game_id"].tolist()[:limit]
     todo = [(w, g) for g in ids for w in what if not client.is_cached(f"{CACHE_PREFIX[w]}/{g // 1000000}/{g}")]
     print(f"{len(ids)} games x {what}: {len(todo)} fetches needed")
     t0, missing = time.time(), 0
@@ -69,6 +69,7 @@ def main(argv: list[str] | None = None) -> int:
     g = sub.add_parser("games")
     g.add_argument("--what", nargs="+", choices=sorted(FETCHERS), default=sorted(FETCHERS))
     g.add_argument("--season", type=int)
+    g.add_argument("--limit", type=int, help="only the first N games (smoke test)")
     args = ap.parse_args(argv)
 
     cfg = load_config(args.config)
@@ -76,7 +77,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "schedule":
         cmd_schedule(cfg, client)
     else:
-        cmd_games(cfg, client, args.what, args.season)
+        cmd_games(cfg, client, args.what, args.season, args.limit)
     return 0
 
 
