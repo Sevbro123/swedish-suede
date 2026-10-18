@@ -95,6 +95,7 @@ def shot_features(events: pd.DataFrame) -> pd.DataFrame:
         {
             "game_id": ev["game_id"],
             "event_id": ev["event_id"],
+            "goalie_id": ev["goalie_id"],
             "season": ev["game_id"] // 1000000 * 10001 + 1,  # 2023 -> 20232024
             "goal": goal.astype(int),
             "is_shot": ev["type"].isin(UNBLOCKED),
@@ -128,7 +129,7 @@ def shot_features(events: pd.DataFrame) -> pd.DataFrame:
 
 
 def feature_cols(f: pd.DataFrame) -> list[str]:
-    return [c for c in f.columns if c not in ("game_id", "event_id", "season", "goal")]
+    return [c for c in f.columns if c not in ("game_id", "event_id", "goalie_id", "season", "goal")]
 
 
 def fit_lgb(train: pd.DataFrame, params: dict[str, Any]) -> lgb.LGBMClassifier:
@@ -162,7 +163,8 @@ def run(cfg: dict[str, Any]) -> pd.DataFrame:
         p = m.predict_proba(test[feature_cols(test)])[:, 1]
         b = fit_distance_baseline(train)
         pb = b.predict_proba(test[b.cols_])[:, 1]
-        test.assign(xg=p)[["game_id", "event_id", "xg"]].to_parquet(out_dir / f"{s}.parquet", index=False)
+        test.assign(xg=p)[["game_id", "event_id", "goalie_id", "goal", "empty_net", "xg"]].to_parquet(
+            out_dir / f"{s}.parquet", index=False)
         report.append(
             {
                 "season": s,

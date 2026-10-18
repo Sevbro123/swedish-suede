@@ -30,3 +30,11 @@ lineage:
   53: 27   # Arizona Coyotes (2014-) <- Phoenix Coyotes
   59: 53   # Utah Hockey Club (2024-) <- Arizona Coyotes (hockey operations transferred)
   68: 59   # Utah Mammoth (2025-) <- Utah Hockey Club
+
+goalies:
+  # GSAx per 100 shots is shrunk toward 0 (league average) with this many pseudo-shots.
+  # Single-season goalie GSAx is very noisy, so the prior is deliberately strong. Tunable.
+  prior_shots: 800
+  ewm_halflife_games: 20
+  candidate_pool_games: 20   # candidates = goalies who started any of the previous N team games
+  seed: 0

@@ -46,8 +46,12 @@ def _state_seconds(ev: pd.DataFrame) -> pd.DataFrame:
     return s.groupby("game_id").sum()
 
 
-def build_team_games(events: pd.DataFrame, games: pd.DataFrame) -> pd.DataFrame:
+def build_team_games(events: pd.DataFrame, games: pd.DataFrame, xg: pd.DataFrame | None = None) -> pd.DataFrame:
+    """``xg`` (game_id, event_id, xg) adds xg_for/against and xg_5v5; absent shots count as 0,
+    and games with no xG at all (burn-in season) get NaN."""
     ev = events[events["period_type"] != "SO"].copy()
+    if xg is not None:
+        ev = ev.merge(xg[["game_id", "event_id", "xg"]], on=["game_id", "event_id"], how="left")
     ev = ev[ev["event_team_id"].notna()]
     st = _strength(ev)
     shot = ev["type"].isin(SHOTS)
@@ -62,7 +66,10 @@ def build_team_games(events: pd.DataFrame, games: pd.DataFrame) -> pd.DataFrame:
         }
     )
     is5 = st["goalies_in"] & (st["own"] == 5) & (st["opp"] == 5)
-    for c in ("goals", "sog", "fenwick", "corsi"):
+    has_xg = xg is not None
+    if has_xg:
+        cols["xg"] = ev["xg"].fillna(0.0)
+    for c in ("goals", "sog", "fenwick", "corsi") + (("xg",) if has_xg else ()):
         cols[f"{c}_5v5"] = cols[c] * is5
     cols["pp_goals"] = cols["goals"] * (st["goalies_in"] & (st["own"] > st["opp"]))
     cols["sh_goals"] = cols["goals"] * (st["goalies_in"] & (st["own"] < st["opp"]))
@@ -85,8 +92,12 @@ def build_team_games(events: pd.DataFrame, games: pd.DataFrame) -> pd.DataFrame:
     opp = own.rename(columns={c: f"{c}_against" for c in stat_cols})
     tg = tg.merge(opp, left_on=["game_id", "opp_id"], right_index=True, how="left")
     tg = tg.rename(columns={c: f"{c}_for" for c in stat_cols})
-    num = [c for c in tg.columns if c.endswith("_for") or c.endswith("_against")]
+    num = [c for c in tg.columns if (c.endswith("_for") or c.endswith("_against")) and not c.startswith("xg")]
     tg[num] = tg[num].fillna(0).astype("int64")
+    if has_xg:
+        scored = set(xg["game_id"].unique())
+        for c in [c for c in tg.columns if c.startswith("xg")]:
+            tg[c] = tg[c].fillna(0.0).where(tg["game_id"].isin(scored))
 
     t = _state_seconds(events)
     tg = tg.merge(t, left_on="game_id", right_index=True, how="left")
