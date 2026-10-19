@@ -74,3 +74,10 @@ def test_calibration_set_is_capped_for_short_histories(monkeypatch):
     monkeypatch.setattr(families, "_base_model", lambda cfg: Spy(real(cfg)))
     make_family({"type": "logreg", "calibration": "platt", "calib_games": 1500})(f.iloc[:1230], f.iloc[1230:])
     assert seen["n"] == 1230 - int(0.2 * 1230)  # 20% held out, not all 1,500
+
+
+def test_calibration_split_never_splits_simultaneous_games():
+    f = frame(n=2000)
+    f["start_time_utc"] = f["start_time_utc"].dt.floor("1D")  # four games per start time
+    p = make_family({"type": "logreg", "calibration": "platt", "calib_games": 301})(f.iloc[:1600], f.iloc[1600:])
+    assert p.shape == (400,)

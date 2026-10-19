@@ -112,7 +112,10 @@ def make_family(cfg: dict[str, Any]):
         k = min(n_cal, int(cfg.get("calib_max_frac", 0.2) * len(train)))
         if len(train) - k < 500:
             raise ValueError(f"only {len(train) - k} games left to fit the base model before calibration")
-        fit_part, cal_part = train.iloc[:-k], train.iloc[-k:]
+        # split at a time boundary: games often share a start time, and a row-count split could
+        # put simultaneous games on both sides
+        t_cut = train["start_time_utc"].iloc[-k]
+        fit_part, cal_part = train[train["start_time_utc"] < t_cut], train[train["start_time_utc"] >= t_cut]
         if fit_part["start_time_utc"].max() >= cal_part["start_time_utc"].min():
             raise AssertionError("calibration set must come strictly after the base model's training data")
         m = _base_model(cfg).fit(full_design(fit_part, names), fit_part["home_win"])
