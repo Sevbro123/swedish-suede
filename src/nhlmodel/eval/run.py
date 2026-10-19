@@ -89,7 +89,7 @@ def log_run(cfg: dict, period: str, res: dict) -> str:
         "seasons": f"{PERIODS[period][0]}-{PERIODS[period][-1]}",
         "split": "walk-forward, monthly refit, expanding window from 2011-12",
         "model": m["type"], "hyperparams": json.dumps(hyper, sort_keys=True),
-        "feature_groups": "+".join(m.get("groups", [])) or "-", "window": m.get("window", "-"),
+        "feature_groups": "+".join(m.get("groups", [])) or m.get("features", "-"), "window": m.get("window", "-"),
         "goalie_variant": m.get("goalie_variant", "-") if "goalie" in m.get("groups", []) else "-",
         "n_games": o["n"], "log_loss": round(o["log_loss"], 5), "log_loss_lo": round(o["log_loss_ci"][0], 5),
         "log_loss_hi": round(o["log_loss_ci"][1], 5), "brier": round(o["brier"], 5), "brier_lo": round(o["brier_ci"][0], 5),

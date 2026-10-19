@@ -55,9 +55,11 @@ def make_logreg(cfg: dict[str, Any]):
 
 
 def make_model(cfg: dict[str, Any]):
+    """Baselines (constant / logreg on a named feature set) or a Phase 3 family on the full matrix."""
     kind = cfg["type"]
     if kind == "constant":
         return fit_predict_constant
-    if kind == "logreg":
+    if kind == "logreg" and "groups" in cfg:
         return make_logreg(cfg)
-    raise ValueError(f"unknown model type {kind!r}")
+    from .families import make_family
+    return make_family(cfg)

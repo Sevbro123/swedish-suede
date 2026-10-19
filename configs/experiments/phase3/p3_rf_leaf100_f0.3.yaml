@@ -1,0 +1,10 @@
+id: p3_rf_leaf100_f0.3
+notes: Phase 3 dev grid (uncalibrated), full feature matrix.
+model:
+  type: rf
+  params:
+    n_estimators: 500
+    min_samples_leaf: 100
+    max_features: 0.3
+  features: full
+  calibration: none

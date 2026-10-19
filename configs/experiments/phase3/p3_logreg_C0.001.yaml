@@ -1,0 +1,8 @@
+id: p3_logreg_C0.001
+notes: Phase 3 dev grid (uncalibrated), full feature matrix.
+model:
+  type: logreg
+  params:
+    C: 0.001
+  features: full
+  calibration: none

@@ -1,0 +1,10 @@
+id: p3_lgbm_l7_lr0.01_n600
+notes: Phase 3 dev grid (uncalibrated), full feature matrix.
+model:
+  type: lgbm
+  params:
+    num_leaves: 7
+    learning_rate: 0.01
+    n_estimators: 600
+  features: full
+  calibration: none
