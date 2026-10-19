@@ -52,3 +52,17 @@ def test_penalty_shots_and_blocked_shots_excluded():
 def test_empty_net_shot_kept_and_flagged():
     f = shot_features(pd.DataFrame([ev(situation_code="0651", away_goalie_in=0, away_skaters=6)]))
     assert len(f) == 1 and f.loc[0, "empty_net"] == 1
+
+
+def test_ece_zero_when_calibrated_and_positive_when_not():
+    from nhlmodel.xg.model import ece
+
+    rng = np.random.default_rng(0)
+    p = rng.uniform(0.01, 0.3, 200_000)
+    y = (rng.uniform(size=p.size) < p).astype(int)
+    assert ece(y, p) < 0.003
+    assert ece(y, np.clip(p * 1.5, 0, 1)) > 0.03
+
+
+def test_shot_without_y_coordinate_is_dropped():
+    assert len(shot_features(pd.DataFrame([ev(y=float("nan"))]))) == 0  # real data stores missing y as NaN

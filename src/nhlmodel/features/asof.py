@@ -37,13 +37,14 @@ def _league_asof(tg: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     """Per row: league mean per team-game of ``cols`` over team-games that started strictly earlier."""
     order = tg.sort_values("start_time_utc")
     cums = order[cols].cumsum()
-    n = np.arange(1, len(order) + 1)
+    n = order[cols].notna().cumsum().to_numpy()  # per column: rows with a value (xG is NaN in burn-in)
     t = order["start_time_utc"].to_numpy()
     # index of the last row with start time < this row's start time
     idx = np.searchsorted(t, t, side="left") - 1
     out = np.full((len(order), len(cols)), np.nan)
     ok = idx >= 0
-    out[ok] = cums.to_numpy()[idx[ok]] / n[idx[ok]][:, None]
+    with np.errstate(invalid="ignore", divide="ignore"):
+        out[ok] = cums.to_numpy()[idx[ok]] / np.where(n[idx[ok]] > 0, n[idx[ok]], np.nan)
     return pd.DataFrame(out, index=order.index, columns=cols).reindex(tg.index)
 
 
@@ -68,9 +69,11 @@ def team_strength(team_games: pd.DataFrame, cfg: dict[str, Any]) -> pd.DataFrame
         raise ValueError("a franchise has two games with the same start time")
     tg = tg.sort_values(["franchise_id", "start_time_utc"]).reset_index(drop=True)
 
-    pairs = [(f"{s}_for", f"{s}_against") for s in cfg["share_stats"]]
+    # stats absent from team_games (e.g. xG when no scores exist) are skipped
+    pairs = [(f"{s}_for", f"{s}_against") for s in cfg["share_stats"] if f"{s}_for" in tg.columns]
     rate_cols = [c for s in cfg["rate_stats"] for c in (f"{s}_for", f"{s}_against")]
-    base = sorted({c for p in pairs for c in p} | set(rate_cols))
+    per60 = [(n, d) for n, d in cfg.get("per60_stats", []) if n in tg.columns and d in tg.columns]
+    base = sorted({c for p in pairs for c in p} | set(rate_cols) | {c for p in per60 for c in p})
     w = cfg["windows"]
     out = tg[["game_id", "team_id", "franchise_id", "season", "start_time_utc"]].copy()
     new: dict[str, pd.Series] = {}  # collected, then joined once (avoids frame fragmentation)
@@ -86,6 +89,8 @@ def team_strength(team_games: pd.DataFrame, cfg: dict[str, Any]) -> pd.DataFrame
         div = counts if counts is not None else 1
         for c in rate_cols:
             new[f"{prefix}_{c}_pg"] = agg[c] / div
+        for n, d in per60:  # e.g. power-play goals per 60 minutes of power-play time
+            new[f"{prefix}_{n}_per60"] = (3600 * agg[n] / agg[d]).where(agg[d] > 0)
 
     if w.get("last_n"):
         if w.get("cross_season", True):

@@ -124,7 +124,8 @@ def shot_features(events: pd.DataFrame) -> pd.DataFrame:
     for t in PREV_TYPES:
         f[f"pt_{t}"] = (f["prev_type"] == t).astype(int)
     # own/opp >= 3 skaters drops penalty shots (situation 1 skater vs 0); empty-net shots are kept.
-    keep = f["is_shot"] & ev["x"].notna() & sign.notna() & (own >= 3) & (opp >= 3)
+    # both coordinates required (3 of ~1.7M shots in 2010-26 have x but no y)
+    keep = f["is_shot"] & ev["x"].notna() & ev["y"].notna() & sign.notna() & (own >= 3) & (opp >= 3)
     return f[keep].drop(columns=["is_shot", "shot_type", "prev_type"]).reset_index(drop=True)
 
 
@@ -146,7 +147,18 @@ def fit_distance_baseline(train: pd.DataFrame) -> LogisticRegression:
     return m
 
 
-def run(cfg: dict[str, Any]) -> pd.DataFrame:
+def ece(y: np.ndarray, p: np.ndarray, bins: int = 20) -> float:
+    """Expected calibration error over equal-count bins: mean |observed - predicted|, weighted by bin size."""
+    order = np.argsort(p)
+    err = 0.0
+    for idx in np.array_split(order, bins):
+        err += len(idx) * abs(y[idx].mean() - p[idx].mean())
+    return err / len(p)
+
+
+def run(cfg: dict[str, Any], tag: str | None = None, write_scores: bool = True) -> pd.DataFrame:
+    """Score every season with a model fit on earlier seasons. ``tag`` names a variant: its report goes to
+    results/xg_eval_<tag>.csv and, unless ``write_scores``, shot scores are not written."""
     proc = repo_path(cfg["processed_dir"])
     seasons = sorted(int(p.stem) for p in (proc / "events").glob("*.parquet"))
     shots = {s: shot_features(pd.read_parquet(proc / "events" / f"{s}.parquet")) for s in seasons}
@@ -163,8 +175,9 @@ def run(cfg: dict[str, Any]) -> pd.DataFrame:
         p = m.predict_proba(test[feature_cols(test)])[:, 1]
         b = fit_distance_baseline(train)
         pb = b.predict_proba(test[b.cols_])[:, 1]
-        test.assign(xg=p)[["game_id", "event_id", "goalie_id", "goal", "empty_net", "xg"]].to_parquet(
-            out_dir / f"{s}.parquet", index=False)
+        if write_scores:
+            test.assign(xg=p)[["game_id", "event_id", "goalie_id", "goal", "empty_net", "xg"]].to_parquet(
+                out_dir / f"{s}.parquet", index=False)
         report.append(
             {
                 "season": s,
@@ -177,21 +190,28 @@ def run(cfg: dict[str, Any]) -> pd.DataFrame:
                 "logloss_distance_baseline": log_loss(test["goal"], pb),
                 "logloss_constant": log_loss(test["goal"], np.full(len(test), train["goal"].mean())),
                 "brier_xg": brier_score_loss(test["goal"], p),
+                "ece_xg": ece(test["goal"].to_numpy(), p),
+                "train_window": cfg.get("train_window_seasons") or "all",
             }
         )
         print({k: (round(v, 4) if isinstance(v, float) else v) for k, v in report[-1].items()}, flush=True)
     rep = pd.DataFrame(report)
     res = repo_path("results")
     res.mkdir(exist_ok=True)
-    rep.to_csv(res / "xg_eval.csv", index=False)
+    rep.to_csv(res / (f"xg_eval_{tag}.csv" if tag else "xg_eval.csv"), index=False)
     return rep
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/xg.yaml")
+    ap.add_argument("--window", type=int, help="train on the last N seasons only (overrides config)")
+    ap.add_argument("--tag", help="variant name: writes results/xg_eval_<tag>.csv and no shot scores")
     args = ap.parse_args(argv)
-    run(load_config(args.config))
+    cfg = load_config(args.config)
+    if args.window:
+        cfg["train_window_seasons"] = args.window
+    run(cfg, tag=args.tag, write_scores=args.tag is None)
     return 0
 
 

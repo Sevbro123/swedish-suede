@@ -12,10 +12,10 @@ from nhlmodel.features.asof import SCHEDULE_COLS, build_features
 CFG = yaml.safe_load(open(repo_path("configs/features/base.yaml")))
 STATS = [
     f"{s}_{side}"
-    for s in ["goals", "sog", "fenwick", "corsi", "goals_5v5", "fenwick_5v5", "corsi_5v5", "pp_goals", "sh_goals",
-              "penalties"]
+    for s in ["goals", "sog", "fenwick", "corsi", "goals_5v5", "fenwick_5v5", "corsi_5v5", "xg", "xg_5v5", "pp_goals",
+              "sh_goals", "penalties"]
     for side in ("for", "against")
-]
+] + ["toi_pp_s", "toi_pk_s"]
 
 
 def synthetic_league(seed=0, n_teams=6, games_per_season=40, seasons=(20202021, 20212022)):
@@ -50,7 +50,8 @@ def scramble_from(tg, t0, seed):
     tg = tg.copy()
     late = tg["start_time_utc"] >= t0
     for c in STATS:
-        tg.loc[late, c] = rng.integers(0, 1000, late.sum())
+        if c in tg.columns:  # never add columns: that would change the feature set itself
+            tg.loc[late, c] = rng.integers(0, 1000, late.sum())
     return tg
 
 
@@ -135,7 +136,9 @@ def test_real_data_truncation_if_available():
 
     games = pd.read_parquet(repo_path("data/processed/games.parquet"))
     games = games[games.season == 20252026]
-    tg = build_team_games(pd.read_parquet(p), games)
+    xg_path = repo_path("data/processed/xg/20252026.parquet")
+    xg = pd.read_parquet(xg_path) if xg_path.exists() else None
+    tg = build_team_games(pd.read_parquet(p), games, xg)
     base = build_features(games, tg, CFG).set_index("game_id")
     for k, gid in enumerate(games["game_id"].sample(5, random_state=2)):
         t0 = games.loc[games.game_id == gid, "start_time_utc"].iloc[0]

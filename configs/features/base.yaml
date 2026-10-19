@@ -2,8 +2,11 @@
 # experiments override `windows` to compare 5 / 10 / 20 games, season-to-date and EWM.
 
 # Stat pairs turned into shares F / (F + A); per-game for/against rates are emitted too.
-share_stats: [goals, sog, fenwick, corsi, goals_5v5, fenwick_5v5, corsi_5v5]
+share_stats: [goals, sog, fenwick, corsi, goals_5v5, fenwick_5v5, corsi_5v5, xg, xg_5v5]
 rate_stats: [goals, sog, pp_goals, sh_goals, penalties]
+# [numerator, seconds] pairs emitted per 60 minutes: power play (own PP goals per PP minute) and
+# penalty kill (goals allowed while shorthanded per PK minute).
+per60_stats: [[pp_goals_for, toi_pp_s], [pp_goals_against, toi_pk_s]]
 
 windows:
   last_n: [5, 10, 20]        # last N games of this franchise; may span seasons (see cross_season)
