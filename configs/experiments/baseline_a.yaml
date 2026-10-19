@@ -1,0 +1,4 @@
+id: baseline_a
+notes: "Constant P(home win) = training-set home win rate (probabilistic 'always pick home')."
+model:
+  type: constant

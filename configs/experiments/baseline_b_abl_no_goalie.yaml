@@ -1,0 +1,8 @@
+id: baseline_b_abl_no_goalie
+notes: "Dev ablation of Baseline B (diagnostic)."
+model:
+  type: logreg
+  C: 0.01
+  groups: [xg_share, rest, home]
+  window: std
+  goalie_variant: expected

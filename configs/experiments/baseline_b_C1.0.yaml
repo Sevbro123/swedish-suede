@@ -1,0 +1,8 @@
+id: baseline_b_C1.0
+notes: "Baseline B C-sweep on dev only: logistic regression, home-minus-away diffs."
+model:
+  type: logreg
+  C: 1.0
+  groups: [xg_share, goalie, rest, home]
+  window: std
+  goalie_variant: expected
