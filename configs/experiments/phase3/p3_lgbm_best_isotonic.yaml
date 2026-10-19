@@ -4,7 +4,7 @@ notes: 'Phase 3 calibration round on dev: best uncalibrated lgbm + isotonic fit 
 model:
   type: lgbm
   params:
-    num_leaves: 3
+    num_leaves: 2
     learning_rate: 0.02
     n_estimators: 300
   calibration: isotonic

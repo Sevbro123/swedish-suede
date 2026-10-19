@@ -59,3 +59,18 @@ def test_platt_recovers_a_monotone_rescaling():
     y = (rng.uniform(size=p.size) < np.clip(0.5 + 1.5 * (p - 0.5), 0, 1)).astype(int)
     q = CALIBRATORS["platt"]().fit(p, y).predict(p)
     assert np.corrcoef(q, p)[0, 1] > 0.99 and q.std() > p.std()  # stretched out, order kept
+
+
+def test_calibration_set_is_capped_for_short_histories(monkeypatch):
+    f = frame(n=1500)
+    seen = {}
+    real = families._base_model
+
+    class Spy:
+        def __init__(self, m): self.m = m
+        def fit(self, X, y): seen["n"] = len(X); self.m.fit(X, y); return self
+        def predict_proba(self, X): return self.m.predict_proba(X)
+
+    monkeypatch.setattr(families, "_base_model", lambda cfg: Spy(real(cfg)))
+    make_family({"type": "logreg", "calibration": "platt", "calib_games": 1500})(f.iloc[:1230], f.iloc[1230:])
+    assert seen["n"] == 1230 - int(0.2 * 1230)  # 20% held out, not all 1,500

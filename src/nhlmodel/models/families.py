@@ -4,7 +4,8 @@ All families see the SAME features (``full_design``) and the same walk-forward s
 differences come from the model, not the inputs.
 
 Calibration (optional, any family): inside each refit, the training pool is split by time.
-The most recent ``calib_games`` games before the refit cutoff form the calibration set; the
+The most recent ``calib_games`` games before the refit cutoff (at most ``calib_max_frac`` = 20% of
+the pool, for early refits with little history) form the calibration set; the
 base model is fit only on the games before them, and the calibrator (Platt = logistic on the
 logit, or isotonic) is fit on the base model's predictions for the calibration set. Test games
 are never touched, and the calibration games are never in the base model's training data.
@@ -106,7 +107,12 @@ def make_family(cfg: dict[str, Any]):
         if calib == "none":
             m = _base_model(cfg).fit(full_design(train, names), train["home_win"])
             return m.predict_proba(full_design(test, names))[:, 1]
-        fit_part, cal_part = train.iloc[:-n_cal], train.iloc[-n_cal:]
+        # Early refits have little history (the first dev refit trains on 2011-12 alone), so the
+        # calibration set is capped at a fraction of the pool rather than taking all of it.
+        k = min(n_cal, int(cfg.get("calib_max_frac", 0.2) * len(train)))
+        if len(train) - k < 500:
+            raise ValueError(f"only {len(train) - k} games left to fit the base model before calibration")
+        fit_part, cal_part = train.iloc[:-k], train.iloc[-k:]
         if fit_part["start_time_utc"].max() >= cal_part["start_time_utc"].min():
             raise AssertionError("calibration set must come strictly after the base model's training data")
         m = _base_model(cfg).fit(full_design(fit_part, names), fit_part["home_win"])
