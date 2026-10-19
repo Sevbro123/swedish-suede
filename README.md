@@ -13,7 +13,8 @@ de-vigged market, with time-ordered validation and confidence intervals.
 | 0 Data discovery | done: [`docs/phase0_data_discovery.md`](docs/phase0_data_discovery.md) (live-verified) |
 | 1 Dataset & features | mostly done: 16 seasons ingested; xG, goalie, team-strength and situational features. Remaining: score/venue adjustment, player ratings, EDGE |
 | 2 Baselines | done: see results below and `docs/eval_protocol.md` |
-| 3–5 | not started (5 deferred: no odds data) |
+| 3 Model families | done: see results below and `docs/phase3_choices.md` |
+| 4–5 | not started (5 deferred: no odds data) |
 
 **To do (before live/forward use):** an `update` command for the current season. It
 fetches the schedule uncached, downloads per-game data only for games that went final
@@ -30,6 +31,14 @@ Log loss with 95% day-block bootstrap intervals; full table in `results/experime
 | Baseline A: constant home win rate | 0.6887 [0.6863, 0.6911] | 0.6907 [0.6889, 0.6925] |
 | Baseline B: logistic, xG share + goalie + rest + home | 0.6756 [0.6712, 0.6801] | 0.6663 [0.6621, 0.6706] |
 | B with the *actual* starter (leaky upper bound) | 0.6758 | 0.6664 (within noise of B) |
+| Logistic regression, full 140-column matrix (C=0.001) | 0.6727 [0.6683, 0.6770] | **0.6650** [0.6602, 0.6696] |
+| Random forest (leaf 200), same matrix | 0.6751 [0.6712, 0.6791] | 0.6671 [0.6628, 0.6714] |
+| LightGBM (2-leaf trees), same matrix | 0.6747 [0.6704, 0.6790] | 0.6670 [0.6628, 0.6710] |
+
+Phase 3 paired test differences: forest minus logistic +0.0021 [+0.0007, +0.0037] and LightGBM minus
+logistic +0.0020 [+0.0004, +0.0035] (logistic better); logistic on 140 columns minus Baseline B on 5
+features -0.0013 [-0.0035, +0.0007] (within noise). Calibration (Platt or isotonic on a held-out,
+time-ordered set) made every family worse on dev and was not used.
 
 ## Setup
 
