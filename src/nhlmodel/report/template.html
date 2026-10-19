@@ -56,9 +56,7 @@
     background: linear-gradient(90deg, var(--s1), var(--s2) 60%, var(--s3)); -webkit-background-clip: text; background-clip: text; color: transparent;
     filter: drop-shadow(0 0 18px var(--glow)); white-space: pre; display: inline-block; text-align: left; }
   @media (max-width: 700px) { #logo { font-size: clamp(6px, 2.9vw, 15px); } }
-  .tag { color: var(--ink-2); margin: 18px 0 30px; font-size: 16px; }
-  .tag .mono { color: var(--accent); }
-  #start { font: 600 15px "JetBrains Mono", monospace; letter-spacing: .3em; color: var(--ink); background: none; border: 1px solid var(--line);
+  #start { margin-top: 36px; font: 600 15px "JetBrains Mono", monospace; letter-spacing: .3em; color: var(--ink); background: none; border: 1px solid var(--line);
     padding: 12px 22px; border-radius: 10px; cursor: pointer; animation: pulse 1.6s ease-in-out infinite; }
   #start:hover { border-color: var(--accent); background: var(--glow); }
   @keyframes pulse { 50% { opacity: .45; } }
@@ -183,7 +181,6 @@
 <main id="stage">
   <section id="title" aria-label="Title screen">
     <pre id="logo" aria-label="swedish suede"></pre>
-    <p class="tag">a cheeky front end for an <span class="mono">honest</span> NHL win-probability model</p>
     <button id="start" type="button">PRESS START</button>
   </section>
 
