@@ -1,0 +1,12 @@
+id: p3_rf_best_isotonic
+notes: 'Phase 3 calibration round on dev: best uncalibrated rf + isotonic fit on the
+  1,500 most recent games before each refit.'
+model:
+  type: rf
+  params:
+    n_estimators: 500
+    min_samples_leaf: 200
+    max_features: sqrt
+  calibration: isotonic
+  calib_games: 1500
+  features: full

@@ -1,0 +1,10 @@
+id: p3_lgbm_l2_lr0.02_n300
+notes: 'Phase 3 dev grid: 2-leaf trees (stumps); 3 leaves was the edge of the grid.'
+model:
+  type: lgbm
+  params:
+    num_leaves: 2
+    learning_rate: 0.02
+    n_estimators: 300
+  calibration: none
+  features: full

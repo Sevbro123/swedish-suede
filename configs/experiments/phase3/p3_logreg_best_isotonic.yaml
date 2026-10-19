@@ -1,0 +1,10 @@
+id: p3_logreg_best_isotonic
+notes: 'Phase 3 calibration round on dev: best uncalibrated logreg + isotonic fit
+  on the 1,500 most recent games before each refit.'
+model:
+  type: logreg
+  params:
+    C: 0.001
+  calibration: isotonic
+  calib_games: 1500
+  features: full

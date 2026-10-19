@@ -1,0 +1,10 @@
+id: p3_logreg_best_platt
+notes: 'Phase 3 calibration round on dev: best uncalibrated logreg + platt fit on
+  the 1,500 most recent games before each refit.'
+model:
+  type: logreg
+  params:
+    C: 0.001
+  calibration: platt
+  calib_games: 1500
+  features: full

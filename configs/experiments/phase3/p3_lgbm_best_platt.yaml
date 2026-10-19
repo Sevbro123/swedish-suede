@@ -1,0 +1,12 @@
+id: p3_lgbm_best_platt
+notes: 'Phase 3 calibration round on dev: best uncalibrated lgbm + platt fit on the
+  1,500 most recent games before each refit.'
+model:
+  type: lgbm
+  params:
+    num_leaves: 3
+    learning_rate: 0.02
+    n_estimators: 300
+  calibration: platt
+  calib_games: 1500
+  features: full
