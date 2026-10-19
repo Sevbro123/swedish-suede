@@ -143,12 +143,25 @@
     line-height: 22px; letter-spacing: 1px; color: var(--bg); background: var(--c); transition: width 900ms cubic-bezier(.2,.8,.2,1); }
   .bar-fill::before { content: attr(data-tex); opacity: .5; padding-left: 3px; }
 
+  /* experiments: ascii forest plot */
+  .forest { font: 13px/1.6 "JetBrains Mono", monospace; font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; overflow-x: auto; }
+  .fr { display: grid; grid-template-columns: minmax(150px, 1.2fr) minmax(220px, 2fr) 92px; gap: 12px; align-items: center; padding: 3px 6px; border-radius: 8px; white-space: nowrap; }
+  .fr:hover, .fr:focus-visible { background: var(--glow); }
+  .fr .nm { overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
+  .fr .nm .chip { margin-left: 6px; }
+  .fr .ci, .axis span { color: var(--muted); letter-spacing: 0; white-space: pre; }
+  .fr .ci b { color: var(--accent); font-weight: 600; }
+  .fr.leaky .ci b { color: var(--accent-2); }
+  .fr .v { text-align: right; color: var(--ink-2); }
+  .axis { color: var(--muted); font-size: 12px; }
+  @media (max-width: 620px) { .fr { grid-template-columns: 1fr 74px; } .fr .ci { grid-column: 1 / -1; } }
+
   /* locked + settings */
   .locked-box { display: grid; grid-template-columns: auto 1fr; gap: 26px; align-items: center; padding: 10px 4px; }
   .locked-box pre { margin: 0; font-size: 14px; line-height: 1.1; color: var(--accent-2); }
   .locked-box h3 { font-size: 20px; margin: 0 0 6px; } .locked-box p { margin: 0 0 8px; color: var(--ink-2); }
   @media (max-width: 560px) { .locked-box { grid-template-columns: 1fr; } }
-  .opt { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .opt { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 14px; padding: 12px 0; border-bottom: 1px solid var(--line); }
   .opt:last-child { border-bottom: 0; }
   .opt .d { color: var(--muted); font-size: 13px; }
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
@@ -341,7 +354,7 @@
     { id: "overview", label: "OVERVIEW", desc: "where the project stands", unlocked: true },
     { id: "data", label: "DATA VAULT", desc: "16 seasons, quality-checked", unlocked: true },
     { id: "xg", label: "EXPECTED GOALS", desc: "the shot-quality model, held-out", unlocked: !!D.xg },
-    { id: "experiments", label: "EXPERIMENTS", desc: "windows, EDGE, layered models", unlocked: !!D.experiments,
+    { id: "experiments", label: "EXPERIMENTS", desc: "every logged run, with confidence intervals", unlocked: !!D.experiments,
       need: "Phase 2-4 results: experiments run on held-out seasons with bootstrap confidence intervals." },
     { id: "games", label: "GAME EXPLORER", desc: "held-out predictions, game by game", unlocked: !!D.predictions,
       need: "held-out predictions from the Phase 2 baselines." },
@@ -459,7 +472,7 @@
         ["Seasons processed", `${processed.length}/${S.length}`, "quality-checked, published"],
         ["Raw data downloaded", pct((pbp + sh) / (2 * total), 0), "play-by-play + shift charts"],
         latest ? ["xG log loss", latest.xg.toFixed(4), `held-out ${latest.label}`] : ["xG log loss", "-", "not evaluated yet"]];
-      const PH = [["0", "Data discovery", "done"], ["1", "Dataset and features", "wip"], ["2", "Baselines", "todo"],
+      const PH = [["0", "Data discovery", "done"], ["1", "Dataset and features", "wip"], ["2", "Baselines", "done"],
                   ["3", "Model families", "todo"], ["4", "Experiments", "todo"], ["5", "Market backtest", "deferred"]];
       const ico = { done: ["[x]", "done", "done"], wip: ["[~]", "wip", "in progress"], todo: ["[ ]", "", "not started"], deferred: ["[-]", "", "deferred: no odds"] };
       body.innerHTML = `<p class="sub">Every number here is read from files on disk when the page is built. Sections without real results stay locked.</p>` +
@@ -519,6 +532,51 @@
         `<div style="margin-top:8px;font-size:12px;color:var(--muted)">source: results/xg_eval.csv, modified ${esc(D.xg.modified)}</div></div>`;
       const bars = body.querySelectorAll(".bar-fill");
       setTimeout(() => bars.forEach((b, i) => setTimeout(() => { b.style.width = b.dataset.w + "%"; }, calm ? 0 : i * 55)), calm ? 0 : 380);
+    },
+
+    experiments(body) {
+      const rows = D.experiments.rows;
+      const periods = [...new Set(rows.map((r) => r.period))].sort();
+      let period = periods.includes("test") ? "test" : periods[0];
+      const draw = () => {
+        const R = rows.filter((r) => r.period === period).sort((a, b) => a.log_loss - b.log_loss);
+        const lo = Math.min(...R.map((r) => r.log_loss_lo)), hi = Math.max(...R.map((r) => r.log_loss_hi));
+        const pad = (hi - lo) * 0.06, a = lo - pad, b = hi + pad, W = innerWidth < 620 ? 30 : 46;
+        const pos = (v) => Math.max(0, Math.min(W - 1, Math.round(((v - a) / (b - a)) * (W - 1))));
+        const ci = (r) => {   // ascii interval: ----[===|===]----
+          const cells = Array(W).fill("-"), l = pos(r.log_loss_lo), h = pos(r.log_loss_hi), m = pos(r.log_loss);
+          for (let i = l; i <= h; i++) cells[i] = "=";
+          cells[l] = "["; cells[h] = "]"; cells[m] = "|";
+          return esc(cells.join("")).replace(/(\[[=|]*\])/, "<b>$1</b>");
+        };
+        const lab = (x) => `${String(x).slice(0, 4)}-${String(x).slice(6, 8)}`;   // 20122013 -> 2012-13
+        const seasons = R.length ? String(R[0].seasons).split("-").map(lab).join(" to ") : "";
+        $("ex-body").innerHTML =
+          `<div class="sub" style="margin-bottom:10px">Split: <b>${esc(period)}</b> period, seasons ${esc(seasons)}; ${esc(R[0] ? R[0].split : "")}. ` +
+          `Bars show log loss with a 95% day-block bootstrap interval; lower is better. Overlapping intervals are not a paired test: see the paired comparisons in the notes.</div>` +
+          `<div class="forest" role="list">` + R.map((r) => {
+            const leaky = String(r.goalie_variant) === "actual";
+            return `<div class="fr${leaky ? " leaky" : ""}" role="listitem" tabindex="0" data-tip="${esc(
+              `${r.experiment} (${r.period})\nlog loss ${(+r.log_loss).toFixed(5)} [${(+r.log_loss_lo).toFixed(5)}, ${(+r.log_loss_hi).toFixed(5)}]\n` +
+              `Brier ${(+r.brier).toFixed(5)}  ECE ${(+r.ece).toFixed(4)}  accuracy ${(100 * r.accuracy).toFixed(1)}%\n` +
+              `${r.model}${r.feature_groups && r.feature_groups !== "-" ? " on " + r.feature_groups : ""}\nn = ${fmt(r.n_games)} games` +
+              (r.log_loss_excl_2020_21 !== "" ? `\nexcl. 2020-21: ${(+r.log_loss_excl_2020_21).toFixed(5)}` : ""))}">` +
+              `<span class="nm">${esc(r.experiment)}${leaky ? '<span class="chip lock">leaky</span>' : ""}</span>` +
+              `<span class="ci">${ci(r)}</span><span class="v">${(+r.log_loss).toFixed(4)}</span></div>`;
+          }).join("") +
+          `<div class="fr axis" aria-hidden="true"><span></span><span class="ci">${esc(a.toFixed(3) + " ".repeat(Math.max(1, W - a.toFixed(3).length - b.toFixed(3).length)) + b.toFixed(3))}</span><span></span></div></div>` +
+          `<details style="margin-top:12px"><summary style="cursor:pointer;color:var(--ink-2)">Table view</summary><div class="tbl-wrap"><table class="data" style="margin-top:8px">` +
+          `<thead><tr><th>Run</th><th>Model</th><th>Groups</th><th>Goalie</th><th>n</th><th>Log loss</th><th>95% CI</th><th>Brier</th><th>ECE</th><th>Acc.</th></tr></thead><tbody>` +
+          R.map((r) => `<tr><td>${esc(r.experiment)}</td><td>${esc(r.model)}</td><td>${esc(r.feature_groups)}</td><td>${esc(r.goalie_variant)}</td><td>${fmt(r.n_games)}</td>` +
+            `<td>${(+r.log_loss).toFixed(5)}</td><td>${(+r.log_loss_lo).toFixed(5)} to ${(+r.log_loss_hi).toFixed(5)}</td><td>${(+r.brier).toFixed(5)}</td>` +
+            `<td>${(+r.ece).toFixed(4)}</td><td>${(100 * r.accuracy).toFixed(1)}%</td></tr>`).join("") + `</tbody></table></div></details>`;
+        $("ex-seg").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.v === period)));
+      };
+      body.innerHTML = `<div class="opt" style="padding-top:0"><div class="d">${rows.length} runs logged in results/experiments.csv. Accuracy is shown but never used to pick models.</div>` +
+        `<div class="seg" id="ex-seg">${periods.map((p) => `<button type="button" data-v="${esc(p)}">${esc(p)}</button>`).join("")}</div></div>` +
+        `<div class="card" id="ex-body"></div>`;
+      $("ex-seg").addEventListener("click", (e) => { const x = e.target.closest("button"); if (x) { period = x.dataset.v; draw(); } });
+      draw();
     },
 
     settings(body) {

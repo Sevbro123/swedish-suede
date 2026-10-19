@@ -80,8 +80,16 @@ def xg_eval() -> dict | None:
 
 
 def experiments() -> dict | None:
+    """Latest logged row per run (the log is append-only, so reruns keep their history)."""
     p = repo_path("results/experiments.csv")
-    return None if not p.exists() else {"rows": pd.read_csv(p).to_dict(orient="records")}
+    if not p.exists():
+        return None
+    df = pd.read_csv(p).drop_duplicates("run_id", keep="last")
+    keep = ["run_id", "experiment", "period", "seasons", "split", "model", "feature_groups", "goalie_variant",
+            "n_games", "log_loss", "log_loss_lo", "log_loss_hi", "brier", "ece", "accuracy", "log_loss_excl_2020_21",
+            "notes", "date_run"]
+    df = df[keep].fillna("")
+    return {"rows": df.to_dict(orient="records")}
 
 
 def git_rev() -> str:

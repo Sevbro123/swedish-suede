@@ -11,13 +11,25 @@ de-vigged market, with time-ordered validation and confidence intervals.
 | Phase | State |
 |---|---|
 | 0 Data discovery | done: [`docs/phase0_data_discovery.md`](docs/phase0_data_discovery.md) (live-verified) |
-| 1 Dataset & features | in progress: cached ingestion, games table, odds loader and vig math done |
-| 2–5 | not started |
+| 1 Dataset & features | mostly done: 16 seasons ingested; xG, goalie, team-strength and situational features. Remaining: score/venue adjustment, player ratings, EDGE |
+| 2 Baselines | done: see results below and `docs/eval_protocol.md` |
+| 3–5 | not started (5 deferred: no odds data) |
 
 **To do (before live/forward use):** an `update` command for the current season. It
 fetches the schedule uncached, downloads per-game data only for games that went final
 at least a day earlier (to pick up NHL stat corrections), caches those, and appends them
 to the processed tables.
+
+## Results so far
+
+Walk-forward, monthly refit, expanding window (protocol fixed in advance: `docs/eval_protocol.md`).
+Log loss with 95% day-block bootstrap intervals; full table in `results/experiments.csv`.
+
+| Model | Dev 2012-13 to 2017-18 (n=6,911) | Test 2018-19 to 2025-26 (n=9,781) |
+|---|---|---|
+| Baseline A: constant home win rate | 0.6887 [0.6863, 0.6911] | 0.6907 [0.6889, 0.6925] |
+| Baseline B: logistic, xG share + goalie + rest + home | 0.6756 [0.6712, 0.6801] | 0.6663 [0.6621, 0.6706] |
+| B with the *actual* starter (leaky upper bound) | 0.6758 | 0.6664 (within noise of B) |
 
 ## Setup
 
