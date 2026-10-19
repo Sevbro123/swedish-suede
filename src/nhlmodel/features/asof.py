@@ -36,8 +36,9 @@ def franchise_ids(team_ids: pd.Series, lineage: dict[int, int]) -> pd.Series:
 def _league_asof(tg: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     """Per row: league mean per team-game of ``cols`` over team-games that started strictly earlier."""
     order = tg.sort_values("start_time_utc")
-    cums = order[cols].cumsum()
-    n = order[cols].notna().cumsum().to_numpy()  # per column: rows with a value (xG is NaN in burn-in)
+    vals = order[cols].astype("float64")  # nullable ints/floats (pd.NA) -> plain float NaN
+    cums = vals.cumsum()
+    n = vals.notna().cumsum().to_numpy()  # per column: rows with a value (xG is NaN in burn-in)
     t = order["start_time_utc"].to_numpy()
     # index of the last row with start time < this row's start time
     idx = np.searchsorted(t, t, side="left") - 1

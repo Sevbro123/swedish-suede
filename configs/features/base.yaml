@@ -41,3 +41,7 @@ goalies:
   ewm_halflife_games: 20
   candidate_pool_games: 20   # candidates = goalies who started any of the previous N team games
   seed: 0
+  # GSAx relative to the league-average GSAx/shot from strictly earlier games this season (xG drifts
+  # between seasons). The running rate is blended with this many pseudo-shots at last season's rate.
+  league_relative: true
+  league_prior_shots: 5000   # chosen on the feature's own league-wide bias (no game outcomes used)

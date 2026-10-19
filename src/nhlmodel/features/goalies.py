@@ -42,9 +42,35 @@ def goalie_games_with_xg(shots_xg: pd.DataFrame, goalie_games: pd.DataFrame, gam
     return gg.sort_values(["player_id", "start_time_utc"]).reset_index(drop=True)
 
 
+def league_offset(gg: pd.DataFrame, prior_shots: float) -> pd.Series:
+    """Per goalie-game: league-average GSAx per shot from games that started strictly earlier.
+
+    xG drifts between seasons (e.g. it ran 5-6% high in recent seasons), which would make every
+    goalie look above average that season. Subtracting this offset makes GSAx league-relative.
+    Within a season, the running league rate is blended with ``prior_shots`` pseudo-shots at the
+    previous season's full rate (0 for the first season).
+    """
+    d = gg[["season", "start_time_utc", "xga", "ga", "shots"]].astype({"xga": float, "ga": float, "shots": float})
+    d = d.assign(g=d["xga"] - d["ga"]).sort_values("start_time_utc")
+    prev_rate = d.groupby("season").apply(lambda x: x["g"].sum() / max(x["shots"].sum(), 1), include_groups=False)
+    prev_rate = prev_rate.shift(1).fillna(0.0)
+    out = pd.Series(0.0, index=d.index)
+    for season, x in d.groupby("season", sort=False):
+        t = x["start_time_utc"].to_numpy()
+        cg, cs = x["g"].cumsum().to_numpy(), x["shots"].cumsum().to_numpy()
+        idx = np.searchsorted(t, t, side="left") - 1  # last row that started strictly earlier
+        g_before = np.where(idx >= 0, cg[np.maximum(idx, 0)], 0.0)
+        s_before = np.where(idx >= 0, cs[np.maximum(idx, 0)], 0.0)
+        m = prev_rate.get(season, 0.0)
+        out.loc[x.index] = (g_before + prior_shots * m) / (s_before + prior_shots)
+    return out.reindex(gg.index)
+
+
 def post_game_state(gg: pd.DataFrame, cfg: dict[str, Any]) -> pd.DataFrame:
     """Each goalie's cumulative state *after* each of his games (includes that game)."""
     gsax = gg["xga"] - gg["ga"]
+    if cfg.get("league_relative", True):
+        gsax = gsax - gg["shots"] * league_offset(gg, cfg.get("league_prior_shots", 5000))
     p = gg["player_id"]
     st = gg[["player_id", "season", "start_time_utc"]].copy()
     st["cum_gsax"] = gsax.groupby(p).cumsum()
