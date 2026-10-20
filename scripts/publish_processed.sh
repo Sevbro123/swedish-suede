@@ -19,6 +19,16 @@ if [ ! -d "$wt" ]; then
   fi
 fi
 
+# Refuse to drop tables: everything already on the branch must exist locally (ALLOW_DROP=1 overrides).
+missing="$(cd "$wt" && find processed -name '*.parquet' 2>/dev/null | while read -r f; do
+  [ -e "$repo/data/$f" ] || echo "  $f"; done)"
+if [ -n "$missing" ] && [ "${ALLOW_DROP:-0}" != 1 ]; then
+  echo "refusing to publish: these tables are on the data branch but not in data/processed:" >&2
+  echo "$missing" >&2
+  echo "restore them first, or rerun with ALLOW_DROP=1 to remove them from the branch" >&2
+  exit 1
+fi
+
 rm -rf "$wt/processed"
 mkdir -p "$wt/processed" "$wt/raw_manifest"
 cp -a "$repo/data/processed/." "$wt/processed/"
