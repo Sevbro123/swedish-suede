@@ -11,7 +11,7 @@ de-vigged market, with time-ordered validation and confidence intervals.
 | Phase | State |
 |---|---|
 | 0 Data discovery | done: [`docs/phase0_data_discovery.md`](docs/phase0_data_discovery.md) (live-verified) |
-| 1 Dataset & features | mostly done: 16 seasons ingested; xG, goalie, team-strength, situational and score/venue-adjusted features (`docs/score_venue_choices.md`). Remaining: player ratings (`docs/player_ratings_spec.md`), EDGE |
+| 1 Dataset & features | mostly done: 16 seasons ingested; xG, goalie, team-strength, situational and score/venue-adjusted features (`docs/score_venue_choices.md`), lineup features from player on-ice xG (`docs/lineup_choices.md`). Remaining: teammate/opponent-adjusted player ratings (`docs/player_ratings_spec.md`), EDGE |
 | 2 Baselines | done: see results below and `docs/eval_protocol.md` |
 | 3 Model families | done: see results below and `docs/phase3_choices.md` |
 | 4–5 | not started (5 deferred: no odds data) |
@@ -32,6 +32,9 @@ Log loss with 95% day-block bootstrap intervals; full table in `results/experime
 | Baseline B: logistic, xG share + goalie + rest + home | 0.6756 [0.6712, 0.6801] | 0.6663 [0.6621, 0.6706] |
 | B with the *actual* starter (leaky upper bound) | 0.6758 | 0.6664 (within noise of B) |
 | B with score-adjusted 5v5 xG share | 0.6755 | 0.6663 (within noise of B) |
+| B + projected-lineup player features | 0.6743 | 0.6655 (within noise of B) |
+| B + *actual* lineup (leaky upper bound) | 0.6741 | 0.6649 |
+| Logistic, full matrix + projected lineup (C=0.001) | 0.6722 | **0.6647** [0.6598, 0.6694] |
 | Logistic regression, full 140-column matrix (C=0.001) | 0.6727 [0.6683, 0.6770] | **0.6650** [0.6602, 0.6696] |
 | Random forest (leaf 200), same matrix | 0.6751 [0.6712, 0.6791] | 0.6671 [0.6628, 0.6714] |
 | LightGBM (2-leaf trees), same matrix | 0.6747 [0.6704, 0.6790] | 0.6670 [0.6628, 0.6710] |
@@ -44,6 +47,12 @@ time-ordered set) made every family worse on dev and was not used.
 Score adjustment of 5v5 xG (trailing teams shoot more) improved Baseline B on dev by -0.00015
 [-0.00022, -0.00008], but on test only by -0.00007 [-0.00016, +0.00002] (within noise). Venue
 adjustment added nothing on dev and was not carried to test. Both stay available as features.
+
+Lineup features (player 5v5 on-ice xG from shift charts, summed over the expected lineup) improved
+Baseline B on dev by -0.00134 [-0.00222, -0.00044]. On test the projected lineup (previous game's
+skaters) gave -0.00079 [-0.00177, +0.00023] (within noise; better in 6 of 8 seasons). The actual
+lineup gave -0.00145 [-0.00253, -0.00031]. Lineups are public about an hour before puck drop, so
+live use could get close to that, but it can't be verified historically.
 
 ## Setup
 
