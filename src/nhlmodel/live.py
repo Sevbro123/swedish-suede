@@ -62,7 +62,7 @@ def main(argv: list[str] | None = None) -> int:
     from .features import build as fbuild
     from .ingest.cli import cmd_update
     from .ingest.http import CachedClient
-    from .predict import PROJECTED, predict
+    from .predict import PROJECTED, predict_explained
     from .report.build import build as build_site
     from .xg.model import run as run_xg
 
@@ -86,8 +86,9 @@ def main(argv: list[str] | None = None) -> int:
     up = up[up["start_time_utc"] > now]
     lp = proc / "lineups_confirmed.parquet"
     confirmed = set(pd.read_parquet(lp)["game_id"]) if lp.exists() else set()
-    preds = predict(feats, labels, up, confirmed)
+    preds, terms = predict_explained(feats, labels, up, confirmed)
     preds.assign(made_at=now.isoformat()).to_parquet(proc / "predictions_upcoming.parquet", index=False)
+    terms.to_parquet(proc / "explain_upcoming.parquet", index=False)
     print(f"predicted {len(preds)} upcoming games")
 
     season_so_far(PROJECTED, season).to_parquet(proc / "predictions_season.parquet", index=False)

@@ -196,6 +196,27 @@
   .split .h { background: var(--s1); border-radius: 0 6px 6px 0; justify-content: flex-end; }
   .game .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .chip.ok { color: var(--good); border-color: color-mix(in srgb, var(--good) 55%, transparent); }
+  a.game { display: block; color: inherit; text-decoration: none; transition: border-color .15s, transform .15s; }
+  a.game:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .game .more { margin-top: 10px; font: 12px "JetBrains Mono", monospace; color: var(--accent); letter-spacing: .06em; }
+  body.calm a.game { transition: none; } body.calm a.game:hover { transform: none; }
+  /* game explainer: diverging bars, away team pulls left, home team pulls right */
+  .drv { display: grid; grid-template-columns: minmax(120px, 200px) 1fr 112px; gap: 10px; align-items: center; padding: 5px 6px; border-radius: 8px; }
+  .drv:hover, .drv:focus-visible { background: var(--glow); }
+  .drv .lab { font-size: 14px; color: var(--ink-2); } .drv .val { font: 13px "JetBrains Mono", monospace; text-align: right; white-space: nowrap; }
+  .drv.axis-row { padding-top: 0; padding-bottom: 0; font: 12px "JetBrains Mono", monospace; color: var(--muted); }
+  .drv.axis-row:hover { background: none; }
+  .drv.axis-row .ends { display: flex; justify-content: space-between; }
+  .dtrack { position: relative; height: 18px; }
+  .dtrack::before { content: ""; position: absolute; left: 50%; top: -4px; bottom: -4px; width: 1px; background: var(--muted); }
+  .dtrack i { position: absolute; top: 0; bottom: 0; }
+  .dtrack i.h { left: 50%; background: var(--s1); border-radius: 0 4px 4px 0; }
+  .dtrack i.a { right: 50%; background: var(--s2); border-radius: 4px 0 0 4px; }
+  .tow-h { color: var(--s1); } .tow-a { color: var(--s2); }
+  @media (max-width: 560px) { .drv { grid-template-columns: 1fr auto; } .drv .dtrack { grid-column: 1 / -1; grid-row: 2; }
+    .drv.axis-row .lab, .drv.axis-row .val { display: none; } .drv.axis-row .ends { grid-column: 1 / -1; } }
+  table.data td.stat { white-space: normal; min-width: 180px; }
+  @media (max-width: 560px) { table.data td.stat { min-width: 0; } }
   ul.recent { list-style: none; margin: 0; padding: 0; font-size: 14px; }
   ul.recent li { display: grid; grid-template-columns: 82px 1fr auto auto; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); align-items: center; }
   ul.recent li:last-child { border-bottom: 0; }
@@ -517,17 +538,18 @@
     field.setDim(view === "panel" ? .35 : view === "menu" ? .75 : 1);
   }
   function route() {
-    const h = location.hash.replace(/^#\/?/, "");
+    const [h, sub] = location.hash.replace(/^#\/?/, "").split("/");
     if (!h) { show("title"); assembleLogo(); return; }
     if (h === "menu") { show("menu"); renderMenu(); select(sel); return; }
     const a = AREAS.find((x) => x.id === h);
     if (!a) { location.hash = "#/menu"; return; }
-    sel = AREAS.indexOf(a); renderPanel(a);
+    sel = AREAS.indexOf(a); renderPanel(a, sub);
   }
   addEventListener("hashchange", route);
   function openArea(a) { location.hash = "#/" + a.id; }
   $("start").addEventListener("click", (e) => { field.burst(e.clientX || innerWidth / 2, e.clientY || innerHeight / 2); location.hash = "#/menu"; });
-  $("back").addEventListener("click", () => { location.hash = "#/menu"; });
+  const backTo = () => (location.hash.split("/").length > 2 ? location.hash.split("/").slice(0, 2).join("/") : "#/menu");
+  $("back").addEventListener("click", () => { location.hash = backTo(); });
 
   document.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -541,7 +563,7 @@
       return;
     }
     if (view === "panel" && (e.key === "Escape" || (e.key === "Backspace" && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)))) {
-      e.preventDefault(); location.hash = "#/menu";
+      e.preventDefault(); location.hash = backTo();
     }
   });
 
@@ -738,11 +760,13 @@
                                                 : `<span class="chip" data-tip="Lineups usually post about an hour before puck drop. Until then the model assumes each team dresses the same players as last game.">expected lineups</span>`];
         if (g.away_b2b) chips.push(`<span class="chip" data-tip="${esc(g.away)} played yesterday too.">${esc(g.away)} on a back-to-back</span>`);
         if (g.home_b2b) chips.push(`<span class="chip" data-tip="${esc(g.home)} played yesterday too.">${esc(g.home)} on a back-to-back</span>`);
-        return `<div class="game" tabindex="0" data-tip="${esc(`${g.away} at ${g.home}\n${g.away} win chance ${a}%\n${g.home} win chance ${h}% (home)\novertime and shootouts included`)}">` +
+        const tipText = `${g.away} at ${g.home}\n${g.away} win chance ${a}%\n${g.home} win chance ${h}% (home)\novertime and shootouts included` +
+          (g.why ? "\nclick to see why" : "");
+        return (g.why ? `<a class="game" href="#/upcoming/${g.game_id}" data-tip="${esc(tipText)}">` : `<div class="game" tabindex="0" data-tip="${esc(tipText)}">`) +
           `<div class="when"><span>${esc(time(g.start_utc))}</span><span>away @ home</span></div>` +
           `<div class="teams-row"><span>${dot(g.away)}${esc(g.away)}</span><span class="at">@</span><span class="h">${esc(g.home)}${dot(g.home)}</span></div>` +
           `<div class="split" role="img" aria-label="${esc(`${g.away} ${a} percent, ${g.home} ${h} percent`)}"><span class="a" style="flex:${a}">${a}%</span><span class="h" style="flex:${h}">${h}%</span></div>` +
-          `<div class="chips">${chips.join("")}</div></div>`;
+          `<div class="chips">${chips.join("")}</div>` + (g.why ? `<div class="more">WHY THIS PICK &gt;</div></a>` : `</div>`);
       };
       const rec = L.season_record, live = L.live_record, lab = L.label || "this season";
       const tiles = rec ? [["Picked the winner", pct(rec.accuracy), `${fmt(rec.n)} games played in ${lab}`],
@@ -750,6 +774,7 @@
                            ["Prediction error", rec.log_loss.toFixed(3), "lower is better; a 50/50 guess scores 0.693"]] : [];
       if (live) tiles.push(["Logged before puck drop", pct(live.accuracy), `picked right in ${fmt(live.n)} games predicted live`]);
       body.innerHTML = `<p class="sub">Each team's next game, with the chance each side wins (overtime and shootouts included). ` +
+        (L.upcoming.some((g) => g.why) ? `Open a game to see what drives its prediction. ` : "") +
         `Updated <b>${esc(ago)}</b>${hours != null && hours > 36 ? ", so these may be out of date" : ""}. Times are in your time zone.</p>` +
         `<div class="games">${L.upcoming.map(card).join("")}</div>` +
         `<div class="note" style="margin-bottom:16px">Analysis only, not betting advice. Even a 65% favorite loses about one game in three.</div>` +
@@ -764,6 +789,53 @@
           `<li>Season numbers re-create each game's prediction the way the backtests do: the model only knows games played before that month.</li>` +
           `<li>"Logged before puck drop" counts predictions this site actually published before each game. It starts small and grows every day.</li>` +
           `<li>Early in a season, a few dozen games can swing these numbers a lot. The long-run test is in the Model Scoreboard.</li></ul></div></div>` : "");
+    },
+
+    // one upcoming game: what pushes the model toward each side (see explain() in report/build.py)
+    upcomingGame(body, id) {
+      const g = D.live.upcoming.find((x) => String(x.game_id) === id);
+      if (!g || !g.why) { location.hash = "#/upcoming"; return; }
+      const W = g.why, H = g.home, A = g.away;
+      const col = (ab) => { const t = TEAMS.find((x) => x[0] === ab); return t ? t[2][0] : "#888888"; };
+      const dot = (ab) => `<i class="tdot" style="background:${col(ab)}"></i>`;
+      const when = new Date(g.start_utc).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+      const h = Math.round(100 * g.p_home), a = 100 - h, fav = h >= 50 ? H : A;
+      const sgn = (v, d) => (v >= 0 ? "+" : "") + v.toFixed(d);
+      const fv = (v, f) => v == null ? "-" : f === "pct" ? (100 * v).toFixed(1) + "%" : f === "pp" ? sgn(100 * v, 1) + " pts"
+        : f === "int" ? String(Math.round(v)) : f === "yesno" ? (v ? "yes" : "no") : f === "signed2" ? sgn(v, 2)
+        : f === "signed1" ? sgn(v, 1) : f === "num1" ? v.toFixed(1) : v.toFixed(2);
+      const toward = (pts) => Math.abs(pts) < .05 ? `<span class="mono" style="color:var(--muted)">no pull</span>`
+        : `<span class="mono ${pts > 0 ? "tow-h" : "tow-a"}">${Math.abs(pts).toFixed(1)} ${esc(pts > 0 ? H : A)}</span>`;
+      const say = (pts) => Math.abs(pts) < .05 ? "no real pull either way" : `${Math.abs(pts).toFixed(1)} points toward ${pts > 0 ? H : A}`;
+      const maxG = Math.max(2, ...W.groups.map((x) => Math.abs(x.pts)));
+      const bar = (pts, max) => { const w = Math.min(50, 50 * Math.abs(pts) / max).toFixed(1);
+        return `<span class="dtrack" aria-hidden="true"><i class="${pts >= 0 ? "h" : "a"}" style="width:${w}%"></i></span>`; };
+      const axis = `<div class="drv axis-row" aria-hidden="true"><span class="lab"></span><span class="ends"><span class="tow-a">&lt; ${esc(A)}</span><span class="tow-h">${esc(H)} &gt;</span></span><span class="val"></span></div>`;
+      const top = W.groups[0];
+      body.innerHTML = `<p class="sub"><a href="#/upcoming" class="mono" style="color:var(--accent)">&lt; all games</a></p>` +
+        `<div class="game" style="margin-bottom:14px"><div class="when"><span>${esc(when)}</span><span>away @ home</span></div>` +
+        `<div class="teams-row"><span>${dot(A)}${esc(A)}</span><span class="at">@</span><span class="h">${esc(H)}${dot(H)}</span></div>` +
+        `<div class="split" role="img" aria-label="${esc(`${A} ${a} percent, ${H} ${h} percent`)}"><span class="a" style="flex:${a}">${a}%</span><span class="h" style="flex:${h}">${h}%</span></div></div>` +
+        `<p class="sub">If these two teams were even on every stat, home ice alone would give ${esc(H)} <b>${pct(W.base)}</b>. ` +
+        `The stats move that to <b>${pct(g.p_home)}</b>, so the model leans ${esc(fav)}. ` +
+        (top ? `The biggest factor is <b>${esc(top.name)}</b>: ${esc(say(top.pts))}.` : "") + `</p>` +
+        `<div class="tiles">` + [
+          [`${H} win chance`, pct(g.p_home, 0), `${A} ${pct(1 - g.p_home, 0)}`],
+          ["Starting point", pct(W.base, 0), `${H} with home ice, teams even`],
+          ["Biggest factor", top ? top.name : "-", top ? say(top.pts) : ""],
+          ["Lineups", g.lineup === "confirmed" ? "posted" : "expected", g.lineup === "confirmed" ? "real lineups in the model" : "assumes last game's players"],
+        ].map(([k, v, s2]) => `<div class="tile"><div class="k">${esc(k)}</div><div class="v" style="font-size:20px">${esc(v)}</div><div class="s">${esc(s2)}</div></div>`).join("") + `</div>` +
+        `<div class="card" style="margin-bottom:14px"><h3>What moves the needle</h3>` +
+        `<p class="note" style="margin:0 0 10px">Each bar: how much ${esc(H)}'s chance would change if the teams were even on that kind of stat, in percentage points.</p>` +
+        axis + W.groups.map((x) => `<div class="drv" tabindex="0" data-tip="${esc(`${x.name}
+${say(x.pts)}`)}"><span class="lab">${esc(x.name)}</span>${bar(x.pts, maxG)}<span class="val">${toward(x.pts)}</span></div>`).join("") +
+        `</div><div class="card"><h3>Biggest single stats</h3><div class="tbl-wrap"><table class="data"><thead><tr><th>Stat</th><th>${esc(A)}</th><th>${esc(H)}</th><th>Pull</th></tr></thead><tbody>` +
+        W.top.map((t) => `<tr><td class="stat">${esc(t.label)}<br><span class="note">${esc(t.group)}</span></td><td class="mono">${esc(fv(t.away, t.fmt))}</td><td class="mono">${esc(fv(t.home, t.fmt))}</td><td>${toward(t.pts)}</td></tr>`).join("") +
+        `</tbody></table></div></div>` +
+        `<div class="card" style="margin-top:14px"><h3>How to read this</h3><ul class="plain">` +
+        `<li>The model compares the two teams on ${fmt(W.n_inputs)} stats (home minus away) and weighs each difference. These numbers come straight from that weighing for this game.</li>` +
+        `<li>Many stats measure nearly the same thing (the same stat over 5, 10 or 20 games), so they share credit, and now and then two of them pull in opposite directions. The grouped bars are the steadier read.</li>` +
+        `<li>Points don't add up exactly, because the same stat difference moves a 50/50 game more than a lopsided one.</li></ul></div>`;
     },
 
     games(body) {
@@ -837,12 +909,12 @@
       `<span class="chip lock">LOCKED</span></div></div>`;
   }
 
-  function renderPanel(a) {
+  function renderPanel(a, sub) {
     show("panel");
     $("p-idx").textContent = String(AREAS.indexOf(a) + 1).padStart(2, "0");
     $("p-title").textContent = a.label;
     const body = $("p-body"); body.scrollTop = 0;
-    if (!a.unlocked) renderLocked(body, a); else RENDER[a.id](body);
+    if (!a.unlocked) renderLocked(body, a); else if (sub && RENDER[a.id + "Game"]) RENDER[a.id + "Game"](body, sub); else RENDER[a.id](body);
     reveal();
     $("back").focus({ preventScroll: true });
   }

@@ -43,3 +43,23 @@ def test_run_info_names_and_kinds():
     assert run_info("baseline_b_leaky_actual")["kind"] == "upper"
     tuned = run_info("p3_logreg_C0.1")
     assert tuned["kind"] == "detail" and "p3_logreg_C0.1" in tuned["name"]
+
+
+def test_explain_groups_and_ranks_terms():
+    import numpy as np
+
+    from nhlmodel.report.build import explain, term_label
+
+    assert term_label("d_l10_xg_5v5_share") == ("Shot quality (xG)", "5-on-5 xG share, last 10 games", "pct")
+    assert term_label("d_std_pp_goals_for_per60")[0] == "Special teams"
+    assert term_label("d_expected_goalie_gsax100_ewm")[0] == "Goaltending"
+    terms = pd.DataFrame({"term": ["intercept", "home_games_played_season", "d_l5_xg_share", "d_ewm5_xg_share",
+                                   "d_expected_goalie_gsax100_ewm", "d_rest_days"],
+                          "logit": [0.15, 0.0, 0.3, 0.1, -0.5, 0.0], "home": np.nan, "away": np.nan})
+    p = float(1 / (1 + np.exp(-terms["logit"].sum())))
+    why = explain(terms, p, top=2)
+    assert why["base"] == round(float(1 / (1 + np.exp(-0.15))), 4) and why["n_inputs"] == 4
+    assert [g["name"] for g in why["groups"]] == ["Goaltending", "Shot quality (xG)", "Rest and schedule"]
+    assert why["groups"][0]["pts"] < 0 < why["groups"][1]["pts"] and why["groups"][2]["pts"] == 0
+    assert [t["group"] for t in why["top"]] == ["Goaltending", "Shot quality (xG)"]
+    assert explain(terms, p + 0.05) is None  # terms that don't reproduce the prediction are not shown
