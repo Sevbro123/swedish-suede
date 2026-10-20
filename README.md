@@ -14,7 +14,8 @@ de-vigged market, with time-ordered validation and confidence intervals.
 | 1 Dataset & features | mostly done: 16 seasons ingested; xG, goalie, team-strength, situational and score/venue-adjusted features (`docs/score_venue_choices.md`), lineup features from player on-ice xG (`docs/lineup_choices.md`). Remaining: teammate/opponent-adjusted player ratings (`docs/player_ratings_spec.md`), EDGE |
 | 2 Baselines | done: see results below and `docs/eval_protocol.md` |
 | 3 Model families | done: see results below and `docs/phase3_choices.md` |
-| 4–5 | not started (5 deferred: no odds data) |
+| 4 Live predictions | done: `python -m nhlmodel.live`, scheduled GitHub Action, site on Vercel (see Live use and Hosting below) |
+| 5 Betting-odds comparison | deferred: no odds data |
 
 **Live use (current season).** One command, run once a day and again shortly before puck drop to pick up
 posted lineups:
@@ -44,6 +45,47 @@ lineups) are stored as dated snapshots; per-game data becomes permanent once a g
 24 h, so NHL stat corrections are picked up. Shift charts the NHL hasn't posted yet (48 early 2026-27
 games so far) are retried on every update. Predictions use the full model with the projected lineup, or,
 once both teams have posted a lineup, the same model trained with actual lineups.
+
+## Outstanding items
+
+Open work, in rough priority order:
+
+1. **Check when lineups post.** The live workflow assumes teams post lineups at least ~30 minutes before
+   puck drop: evening runs are hourly at :35 UTC, so each game gets one 25-55 minutes before it starts. Not yet
+   seen live (none were posted 18 h before a game). If they post later, move the cron times in
+   `.github/workflows/live.yml` or add runs.
+2. **Teammate/opponent-adjusted player ratings** (RAPM), the full version of `docs/player_ratings_spec.md`.
+   The quick version is in use; this should sharpen it. Special teams (PP/PK) would be a later step.
+3. **EDGE features** (prior-season aggregates only; in-season EDGE can't be built without leakage).
+4. **Betting-odds comparison (Phase 5).** Needs a historical odds source with usable terms. The loader and
+   vig math are ready (`src/nhlmodel/odds/`).
+5. **What-if calculator** on the site is still locked (needs the model's coefficients exported).
+6. **Matinee games** (weekend/holiday afternoons) get only the 14:15 UTC prediction with expected lineups:
+   no run catches their posted lineups. Add afternoon runs if that matters.
+7. **Watch the extreme predictions.** Historically, games given under 25% were won 28% of the time
+   (36 games): slightly overconfident. Check again as the live log grows.
+
+Things to keep an eye on:
+
+- **NHL data gaps.** Shift charts are empty upstream for 48 early 2026-27 games (2026020006-2026020053)
+  and 57 games in 2024-25 (2024021235-2024021291). Current-season gaps are retried on every update. The NHL
+  goalie table lags about a day, so a just-played game has no starter until it lands (the starter model
+  covers it).
+- **Scheduled runs stop after 60 days without repo activity** (GitHub rule for public repos). GitHub emails
+  a warning; re-enable under Actions, or push any commit to `main`.
+- **The live predictions log exists only on the `site` branch** (`predictions_log.csv`, carried between
+  runs). Deleting or rewriting that branch by hand loses the live record.
+- **Vercel's production branch must stay `site`** (Settings > Environments > Production > Branch Tracking).
+- **`data` branch size:** `processed/features.parquet` is just over GitHub's 50 MB warning (hard limit
+  100 MB). Before adding many more columns, write it with zstd compression or split it by season.
+- **`scripts/publish_processed.sh`** fails without the raw cache (`data/raw/manifest.jsonl`) and has an old
+  session link hardcoded in its commit message. Fix both before the next manual publish.
+
+**Season rollover** (after the 2026-27 regular season ends): set `seasons.last` to 20262027 and
+`seasons.current` to 20272028 in `configs/data.yaml`; run the full xG model (`python -m nhlmodel.xg.model`)
+and rebuild features; publish the processed tables to the `data` branch. Until the `data` branch includes
+the current season, each Actions run rebuilds it from the raw cache (re-downloaded in a few minutes if the
+cache is evicted after 7 days unused).
 
 ## Results so far
 
