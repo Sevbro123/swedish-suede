@@ -1,0 +1,8 @@
+id: lu_logreg_full_C0.001
+notes: "Phase 3 logistic (C=0.001) on the full matrix plus projected-lineup features (dev)."
+model:
+  type: logreg
+  params:
+    C: 0.001
+  features: full_lineup
+  calibration: none

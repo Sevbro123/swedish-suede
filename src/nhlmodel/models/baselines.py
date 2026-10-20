@@ -21,6 +21,9 @@ GROUPS = {
     "xg_share_sa": ["{w}_xg_5v5_sa_share", "{w}_xg_share"],
     "xg_share_sva": ["{w}_xg_5v5_sva_share", "{w}_xg_share"],
     "goalie": ["{g}_goalie_gsax100_ewm"],
+    # lineup from player on-ice xG (features/players.py): projected (previous game) or leaky actual
+    "lineup": ["lineup_on_xg_share", "lineup_rel_xg_share", "lineup_missing_toi_share"],
+    "lineup_leaky": ["leaky_lineup_on_xg_share", "leaky_lineup_rel_xg_share", "leaky_lineup_missing_toi_share"],
     "rest": ["rest_days", "back_to_back"],
 }
 GOALIE_PREFIX = {"expected": "expected", "projected": "projected", "actual": "leaky_actual"}

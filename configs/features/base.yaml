@@ -9,6 +9,16 @@ rate_stats: [goals, sog, pp_goals, sh_goals, penalties]
 # penalty kill (goals allowed while shorthanded per PK minute).
 per60_stats: [[pp_goals_for, toi_pp_s], [pp_goals_against, toi_pk_s]]
 
+# Player 5v5 on-ice xG metrics and lineup features (features/players.py). Fixed in advance, not tuned.
+# The Phase 3 "full" matrix leaves lineup columns out unless a config asks for them.
+players:
+  halflife_games: 40         # player on/off-ice xG sums, decayed across seasons and teams
+  pseudo_xg: 10              # on-ice share shrinkage: about 300 5v5 minutes of league-average play
+  toi_halflife_games: 10     # expected 5v5 TOI per game (lineup weights)
+  default_toi_s: 600         # expected 5v5 TOI for a player with no history
+  regular_window: 10         # "regular" = dressed in at least regular_min of the previous 10 games
+  regular_min: 5
+
 # Score and venue adjustment of 5v5 corsi / fenwick / xG (features/adjust.py): _sa_ = score-adjusted,
 # _sva_ = score- and venue-adjusted. Coefficients come only from earlier seasons. Fixed in advance,
 # not tuned. The Phase 3 "full" matrix leaves these columns out unless a config asks for them.

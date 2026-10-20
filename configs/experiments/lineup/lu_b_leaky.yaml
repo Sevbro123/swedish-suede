@@ -1,0 +1,8 @@
+id: lu_b_leaky
+notes: "Baseline B + ACTUAL-lineup player features (leaky upper bound, never selected on)."
+model:
+  type: logreg
+  C: 0.01
+  groups: [xg_share, goalie, rest, home, lineup_leaky]
+  window: std
+  goalie_variant: expected

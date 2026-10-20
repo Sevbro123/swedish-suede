@@ -21,6 +21,7 @@ import pandas as pd
 from ..config import load_config, repo_path
 from .asof import build_features
 from .goalies import goalie_features, goalie_games_with_xg
+from .players import lineup_features, player_games, player_states
 from .team_games import build_team_games
 
 OUTCOME_COLS = {"home_score", "away_score", "home_win", "decided_in", "last_period_type", "game_state"}
@@ -30,6 +31,21 @@ def _read_seasons(kind: str, seasons) -> pd.DataFrame:
     proc = repo_path("data/processed")
     paths = [proc / kind / f"{s}.parquet" for s in seasons if (proc / kind / f"{s}.parquet").exists()]
     return pd.concat([pd.read_parquet(p) for p in paths], ignore_index=True) if paths else pd.DataFrame()
+
+
+def _lineups(games: pd.DataFrame, events: pd.DataFrame, xg: pd.DataFrame, seasons, cfg: dict) -> pd.DataFrame:
+    """Player on-ice metrics (seasons with xG and shift charts) -> lineup features per team-game."""
+    pgs = []
+    for s in seasons:
+        sh, xs = _read_seasons("shifts", [s]), xg[xg["game_id"].isin(set(games.loc[games["season"] == s, "game_id"]))]
+        if sh.empty or xs.empty:  # burn-in season has no xG
+            continue
+        q = _read_seasons("quality", [s])
+        bad = set(q.loc[~q["shifts_ok"].fillna(False).astype(bool), "game_id"])
+        ev = events[events["game_id"].isin(set(sh["game_id"]))]
+        pgs.append(player_games(ev, sh, xs, _read_seasons("rosters", [s]), bad))
+    states = player_states(pd.concat(pgs, ignore_index=True), games, cfg["players"])
+    return lineup_features(_read_seasons("rosters", seasons), games, states, cfg["players"], cfg.get("lineage", {}))
 
 
 def assemble(cfg: dict, data_cfg: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -50,6 +66,14 @@ def assemble(cfg: dict, data_cfg: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
         cols = [c for c in gf.columns if c not in ("game_id", "team_id")]
         for side in ("home", "away"):
             side_f = gf.rename(columns={c: f"{side}_{c}" for c in cols})
+            feats = feats.merge(side_f, left_on=["game_id", f"{side}_team_id"], right_on=["game_id", "team_id"],
+                                how="left").drop(columns=["team_id"])
+
+    if "players" in cfg and xg is not None:
+        lf = _lineups(games, events, xg, seasons, cfg)
+        cols = [c for c in lf.columns if c not in ("game_id", "team_id")]
+        for side in ("home", "away"):
+            side_f = lf.rename(columns={c: f"{side}_{c}" for c in cols})
             feats = feats.merge(side_f, left_on=["game_id", f"{side}_team_id"], right_on=["game_id", "team_id"],
                                 how="left").drop(columns=["team_id"])
 

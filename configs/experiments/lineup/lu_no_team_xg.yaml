@@ -1,0 +1,8 @@
+id: lu_no_team_xg
+notes: "Projected-lineup player features instead of team xG share (dev diagnostic)."
+model:
+  type: logreg
+  C: 0.01
+  groups: [lineup, goalie, rest, home]
+  window: std
+  goalie_variant: expected
