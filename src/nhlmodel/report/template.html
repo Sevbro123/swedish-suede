@@ -79,7 +79,6 @@
   button.mi .desc { display: block; font: 13px "Space Grotesk", sans-serif; color: var(--muted); letter-spacing: 0; margin-top: 2px; }
   button.mi.locked .lbl { color: var(--muted); }
   .chip { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-2); white-space: nowrap; }
-  .chip.new { color: var(--good); border-color: color-mix(in srgb, var(--good) 55%, transparent); }
   .chip.lock { color: var(--accent-2); border-color: color-mix(in srgb, var(--accent-2) 50%, transparent); }
   .keys { margin: 16px 6px 0; font-size: 12px; color: var(--muted); }
   .keys kbd { font: 11px "JetBrains Mono", monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; color: var(--ink-2); }
@@ -226,7 +225,7 @@
 
 <div class="hud top">
   <span class="brand">[#] swedish suede</span>
-  <span>AREAS <b id="found">0</b>/<span id="areas">0</span><span class="wide"> &nbsp;|&nbsp; rev <span id="rev"></span></span></span>
+  <span class="wide">rev <span id="rev"></span></span>
 </div>
 
 <main id="stage">
@@ -236,7 +235,7 @@
   </section>
 
   <nav id="menu" aria-label="Main menu" hidden>
-    <div class="menu-head">MAIN MENU &middot; <b id="menu-count"></b></div>
+    <div class="menu-head">MAIN MENU</div>
     <ul class="items" id="items" role="list"></ul>
     <div class="keys"><kbd>up</kbd> <kbd>down</kbd> move &nbsp; <kbd>enter</kbd> open &nbsp; <kbd>esc</kbd> back</div>
   </nav>
@@ -479,12 +478,6 @@
       need: "a finished model exported for the calculator." },
     { id: "settings", label: "SETTINGS", desc: "team colors, light or dark, effects", unlocked: true, meta: true },
   ];
-  const explorable = AREAS.filter((a) => !a.meta);
-  let found = new Set((store.get("suede.found") || "").split(",").filter((x) => explorable.some((a) => a.id === x && a.unlocked)));
-  function hud() {
-    $("found").textContent = found.size; $("areas").textContent = explorable.length;
-    $("menu-count").textContent = `${found.size}/${explorable.length} AREAS DISCOVERED`;
-  }
   $("rev").textContent = D.git_rev;
   $("build").textContent = `built ${D.built_at}`;
 
@@ -492,7 +485,7 @@
   let sel = 0;
   function renderMenu() {
     $("items").innerHTML = AREAS.map((a, i) => {
-      const chip = !a.unlocked ? `<span class="chip lock">LOCKED</span>` : a.meta ? "" : found.has(a.id) ? `<span class="chip">explored</span>` : `<span class="chip new">NEW</span>`;
+      const chip = a.unlocked ? "" : `<span class="chip lock">LOCKED</span>`;
       return `<li><button class="mi${a.unlocked ? "" : " locked"}" type="button" data-i="${i}" aria-current="${i === sel}">` +
         `<span class="cur" aria-hidden="true">&gt;</span><span><span class="lbl" data-label="${esc(a.label)}">${esc(a.label)}</span>` +
         `<span class="desc">${esc(a.desc)}</span></span>${chip}</button></li>`;
@@ -526,7 +519,7 @@
   function route() {
     const h = location.hash.replace(/^#\/?/, "");
     if (!h) { show("title"); assembleLogo(); return; }
-    if (h === "menu") { show("menu"); renderMenu(); hud(); select(sel); return; }
+    if (h === "menu") { show("menu"); renderMenu(); select(sel); return; }
     const a = AREAS.find((x) => x.id === h);
     if (!a) { location.hash = "#/menu"; return; }
     sel = AREAS.indexOf(a); renderPanel(a);
@@ -824,9 +817,7 @@
         <div class="opt"><div><div>Light or dark</div><div class="d">Works with any team's colors.</div></div>
           <div class="seg" id="seg-theme"><button type="button" data-v="dark">dark</button><button type="button" data-v="light">light</button></div></div>
         <div class="opt"><div><div>Effects</div><div class="d">${osReduced ? "Off: your device asks for reduced motion." : "Animated background and text effects."}</div></div>
-          <div class="seg" id="seg-fx"><button type="button" data-v="on">on</button><button type="button" data-v="off">off</button></div></div>
-        <div class="opt"><div><div>Discoveries</div><div class="d">${found.size} of ${explorable.length} areas explored on this device.</div></div>
-          <button class="btn" type="button" id="reset">reset</button></div></div>`;
+          <div class="seg" id="seg-fx"><button type="button" data-v="on">on</button><button type="button" data-v="off">off</button></div></div></div>`;
       const sync = () => {
         $("teams").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === team)));
         $("seg-theme").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === theme)));
@@ -837,7 +828,6 @@
       $("seg-theme").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; theme = b.dataset.v; store.set("suede.theme", theme); applyTheme(); sync(); });
       $("seg-fx").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b || osReduced) return;
         calm = b.dataset.v === "off"; store.set("suede.fx", calm ? "off" : "on"); applyCalm(); sync(); });
-      $("reset").addEventListener("click", () => { found = new Set(); store.set("suede.found", ""); hud(); toast("DISCOVERIES RESET"); RENDER.settings(body); });
       sync();
     },
   };
@@ -855,11 +845,6 @@
     if (!a.unlocked) renderLocked(body, a); else RENDER[a.id](body);
     reveal();
     $("back").focus({ preventScroll: true });
-    if (a.unlocked && !a.meta && !found.has(a.id)) {
-      found.add(a.id); store.set("suede.found", [...found].join(","));
-      setTimeout(() => toast(`NEW AREA DISCOVERED  ${found.size}/${explorable.length}`), calm ? 0 : 420);
-    }
-    hud();
   }
 
   // ---------- tooltip (hover + focus) ----------
@@ -870,7 +855,6 @@
   document.addEventListener("focusin", (e) => { const el = e.target.closest("[data-tip]"); if (el) { const r = el.getBoundingClientRect(); showTip(el.dataset.tip, r.left, r.bottom); } });
   document.addEventListener("focusout", () => tip.classList.remove("on"));
 
-  hud();
   route();
 })();
 </script>
