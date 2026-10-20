@@ -76,10 +76,8 @@ Things to keep an eye on:
 - **The live predictions log exists only on the `site` branch** (`predictions_log.csv`, carried between
   runs). Deleting or rewriting that branch by hand loses the live record.
 - **Vercel's production branch must stay `site`** (Settings > Environments > Production > Branch Tracking).
-- **`data` branch size:** `processed/features.parquet` is just over GitHub's 50 MB warning (hard limit
-  100 MB). Before adding many more columns, write it with zstd compression or split it by season.
-- **`scripts/publish_processed.sh`** fails without the raw cache (`data/raw/manifest.jsonl`) and has an old
-  session link hardcoded in its commit message. Fix both before the next manual publish.
+- **`data` branch size:** `features.parquet` and `labels.parquet` are no longer stored there (rebuilt by
+  `python -m nhlmodel.features.build`), so publishes stay small. Older copies remain in the branch history.
 
 **Season rollover** (after the 2026-27 regular season ends): set `seasons.last` to 20262027 and
 `seasons.current` to 20272028 in `configs/data.yaml`; run the full xG model (`python -m nhlmodel.xg.model`)
@@ -170,6 +168,7 @@ and open themselves once those results exist. The text is written for readers wi
 ```bash
 git fetch origin data
 git archive origin/data processed | tar -x --strip-components=1 -C data/processed
+python -m nhlmodel.features.build      # features.parquet + labels.parquet are not stored there (~1.5 min)
 ```
 
 ## Layout
