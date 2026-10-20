@@ -33,7 +33,7 @@ python -m nhlmodel.predict                      # P(home win) for each team's ne
 ```
 
 **Hosting.** `.github/workflows/live.yml` runs `python -m nhlmodel.live` on GitHub Actions each morning and
-every 30 minutes from 22:10 to 02:40 UTC, then force-pushes the built page to the `site` branch. Vercel deploys
+hourly from 22:35 to 02:35 UTC (6 runs a day), then force-pushes the built page to the `site` branch. Vercel deploys
 that branch: import the repo in Vercel (framework preset "Other", no build command), then set
 Settings > Git > Production Branch to `site`. The root `vercel.json` turns off deployments for every other
 branch. The predictions log (`predictions_log.csv`, the last prediction made before each game) is carried

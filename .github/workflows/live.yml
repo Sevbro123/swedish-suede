@@ -1,13 +1,14 @@
 # Live predictions: bring the current season up to date, predict upcoming games, rebuild the site and
-# publish it to the `site` branch (Vercel deploys that branch). Runs each morning, then every 30 minutes
-# through the evening game window to pick up lineups as teams post them. Times are UTC.
+# publish it to the `site` branch (Vercel deploys that branch). Runs each morning, then hourly through the
+# evening game window to pick up lineups as teams post them: every game gets a run 25-55 minutes before puck
+# drop, both under daylight saving (starts 23:00-02:30 UTC) and without it (00:00-03:30 UTC). Times are UTC.
 name: live predictions
 
 on:
   schedule:
     - cron: "15 14 * * *"
-    - cron: "10,40 22,23 * * *"
-    - cron: "10,40 0-2 * * *"
+    - cron: "35 22,23 * * *"
+    - cron: "35 0-2 * * *"
   workflow_dispatch:
 
 concurrency:
