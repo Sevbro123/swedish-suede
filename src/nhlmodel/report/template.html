@@ -10,12 +10,14 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   /* ---------- tokens: dark is the default look; light is opt-in from Settings ----------
-     Series colors were validated per mode with the dataviz palette checker. */
+     Series colors (--s1..3) were validated per mode with the dataviz palette checker and stay fixed
+     under team themes; a team theme only recolors the chrome (bg, accents, field, logo). --good is
+     the reserved "done / new" status color. */
   :root {
     color-scheme: dark;
     --bg: #0d1424; --card: #121b30; --card-2: #0f1729; --line: #22304d; --ink: #e6eefc; --ink-2: #a9b8d3; --muted: #8394b3;
     --s1: #2a9fd0; --s2: #8a72ea; --s3: #1fa57c;
-    --accent: #2a9fd0; --accent-2: #8a72ea; --glow: rgba(42,159,208,.18);
+    --accent: #2a9fd0; --accent-2: #8a72ea; --glow: rgba(42,159,208,.18); --good: #1fa57c; --logo-c: var(--s3);
     --field-a: 42,159,208; --field-b: 138,114,234; --field-alpha: .7;
     --shadow: 0 1px 2px rgba(0,0,0,.35), 0 18px 50px rgba(0,0,0,.4);
   }
@@ -23,7 +25,7 @@
     color-scheme: light;
     --bg: #f7f9fc; --card: #ffffff; --card-2: #f2f5fa; --line: #dde3ee; --ink: #0e1a2b; --ink-2: #46566f; --muted: #5d6d86;
     --s1: #1f6fd1; --s2: #b0389f; --s3: #0a8462;
-    --accent: #1f6fd1; --accent-2: #b0389f; --glow: rgba(31,111,209,.12);
+    --accent: #1f6fd1; --accent-2: #b0389f; --glow: rgba(31,111,209,.12); --good: #0a8462;
     --field-a: 31,111,209; --field-b: 176,56,159; --field-alpha: .45;
     --shadow: 0 1px 2px rgba(14,26,43,.06), 0 18px 40px rgba(14,26,43,.1);
   }
@@ -53,7 +55,7 @@
   /* ---------- title screen ---------- */
   #title { text-align: center; }
   #logo { margin: 0 auto; font-weight: 800; line-height: 1.05; font-size: clamp(5px, 1.45vw, 15px);
-    background: linear-gradient(90deg, var(--s1), var(--s2) 60%, var(--s3)); -webkit-background-clip: text; background-clip: text; color: transparent;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2) 60%, var(--logo-c)); -webkit-background-clip: text; background-clip: text; color: transparent;
     filter: drop-shadow(0 0 18px var(--glow)); white-space: pre; display: inline-block; text-align: left; }
   @media (max-width: 700px) { #logo { font-size: clamp(6px, 2.9vw, 15px); } }
   #start { display: block; margin: 40px auto 0; font: 600 15px "JetBrains Mono", monospace; letter-spacing: .3em; color: var(--ink); background: none; border: 1px solid var(--line);
@@ -77,7 +79,7 @@
   button.mi .desc { display: block; font: 13px "Space Grotesk", sans-serif; color: var(--muted); letter-spacing: 0; margin-top: 2px; }
   button.mi.locked .lbl { color: var(--muted); }
   .chip { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-2); white-space: nowrap; }
-  .chip.new { color: var(--s3); border-color: color-mix(in srgb, var(--s3) 55%, transparent); }
+  .chip.new { color: var(--good); border-color: color-mix(in srgb, var(--good) 55%, transparent); }
   .chip.lock { color: var(--accent-2); border-color: color-mix(in srgb, var(--accent-2) 50%, transparent); }
   .keys { margin: 16px 6px 0; font-size: 12px; color: var(--muted); }
   .keys kbd { font: 11px "JetBrains Mono", monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; color: var(--ink-2); }
@@ -88,7 +90,7 @@
   #panel::before, #panel::after { content: "+"; position: absolute; font: 14px "JetBrains Mono", monospace; color: var(--accent); z-index: 3; }
   #panel::before { top: 4px; left: 8px; } #panel::after { bottom: 4px; right: 8px; }
   .p-head { display: flex; align-items: center; gap: 14px; padding: 16px 20px 12px; border-bottom: 1px dashed var(--line); }
-  #back { font: 13px "JetBrains Mono", monospace; color: var(--ink-2); background: none; border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; cursor: pointer; }
+  #back { font: 13px "JetBrains Mono", monospace; color: var(--ink-2); background: none; border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; cursor: pointer; white-space: nowrap; flex: none; }
   #back:hover { color: var(--ink); border-color: var(--accent); }
   .p-head h2 { margin: 0; font: 700 22px "Space Grotesk", sans-serif; letter-spacing: -.01em; }
   .p-head .idx { font: 13px "JetBrains Mono", monospace; color: var(--accent); }
@@ -110,7 +112,7 @@
   ol.phases { list-style: none; margin: 0; padding: 0; }
   ol.phases li { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); align-items: center; font-size: 15px; }
   ol.phases li:last-child { border-bottom: 0; }
-  .ph-ico { font: 14px "JetBrains Mono", monospace; color: var(--muted); } .ph-ico.done { color: var(--s3); } .ph-ico.wip { color: var(--accent); }
+  .ph-ico { font: 14px "JetBrains Mono", monospace; color: var(--muted); } .ph-ico.done { color: var(--good); } .ph-ico.wip { color: var(--accent); }
 
   /* table */
   .tbl-wrap { overflow-x: auto; }
@@ -145,7 +147,7 @@
 
   /* experiments: ascii forest plot */
   .forest { font: 13px/1.6 "JetBrains Mono", monospace; font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; overflow-x: auto; }
-  .fr { display: grid; grid-template-columns: minmax(150px, 1.2fr) minmax(220px, 2fr) 92px; gap: 12px; align-items: center; padding: 3px 6px; border-radius: 8px; white-space: nowrap; }
+  .fr { display: grid; grid-template-columns: minmax(180px, 1.6fr) minmax(220px, 2fr) 72px; gap: 12px; align-items: center; padding: 3px 6px; border-radius: 8px; white-space: nowrap; }
   .fr:hover, .fr:focus-visible { background: var(--glow); }
   .fr .nm { overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
   .fr .nm .chip { margin-left: 6px; }
@@ -167,11 +169,24 @@
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
   .seg button { font: 13px "JetBrains Mono", monospace; background: none; border: 0; color: var(--ink-2); padding: 6px 12px; cursor: pointer; }
   .seg button[aria-pressed="true"] { background: var(--glow); color: var(--ink); }
+  .teams { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; width: 100%; margin-top: 4px; }
+  .teams button { display: flex; align-items: center; gap: 8px; font: 13px "JetBrains Mono", monospace; background: none; color: var(--ink-2);
+    border: 1px solid var(--line); border-radius: 9px; padding: 6px 8px; cursor: pointer; text-align: left; }
+  .teams button:hover { border-color: var(--accent); color: var(--ink); }
+  .teams button[aria-pressed="true"] { background: var(--glow); color: var(--ink); border-color: var(--accent); }
+  .teams .dots { display: inline-flex; flex: none; }
+  .teams .dots i { width: 12px; height: 12px; border-radius: 50%; box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 25%, transparent); }
+  .teams .dots i + i { margin-left: -4px; }
+  .plain { margin: 0; padding-left: 18px; color: var(--ink-2); } .plain li { margin: 4px 0; }
+  dl.gloss { margin: 8px 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; color: var(--ink-2); font-size: 14px; }
+  dl.gloss dt { color: var(--ink); font-weight: 500; } dl.gloss dd { margin: 0; }
+  @media (max-width: 560px) { dl.gloss { grid-template-columns: 1fr; } dl.gloss dd { margin-bottom: 6px; } }
+  .note { margin-top: 8px; font-size: 12px; color: var(--muted); }
   .btn { font: 13px "JetBrains Mono", monospace; background: none; border: 1px solid var(--line); color: var(--ink-2); padding: 6px 12px; border-radius: 9px; cursor: pointer; }
 
   /* toast + tooltip */
   #toast { position: fixed; z-index: 8; left: 50%; top: 52px; transform: translate(-50%, -12px); opacity: 0; transition: opacity .25s, transform .25s;
-    font: 12px "JetBrains Mono", monospace; letter-spacing: .18em; color: var(--s3); background: var(--card); border: 1px solid var(--line);
+    font: 12px "JetBrains Mono", monospace; letter-spacing: .18em; color: var(--good); background: var(--card); border: 1px solid var(--line);
     border-radius: 999px; padding: 7px 16px; box-shadow: var(--shadow); pointer-events: none; white-space: nowrap; }
   #toast.on { opacity: 1; transform: translate(-50%, 0); }
   #tip { position: fixed; z-index: 9; pointer-events: none; opacity: 0; transition: opacity .12s; background: var(--card); color: var(--ink);
@@ -214,7 +229,7 @@
 </main>
 
 <div class="hud bottom">
-  <span>analysis only &middot; no wagering module installed</span>
+  <span>for analysis only &middot; not betting advice</span>
   <span class="wide" id="build"></span>
 </div>
 <div id="toast" role="status" aria-live="polite"></div>
@@ -242,9 +257,86 @@
   const pbp = S.reduce((a, s) => a + Math.min(s.pbp_downloaded, s.games), 0);
   const sh = S.reduce((a, s) => a + Math.min(s.shifts_downloaded, s.games), 0);
 
-  // ---------- theme / effects ----------
+  // ---------- theme / team colors / effects ----------
+  /*THEME-START*/
+  // Team colors: [abbrev, name, [primary, secondary, extra]]. Used for the page chrome only.
+  const TEAMS = [
+    ["ANA", "Anaheim Ducks", ["#F47A38", "#B9975B", "#000000"]], ["BOS", "Boston Bruins", ["#FFB81C", "#000000"]],
+    ["BUF", "Buffalo Sabres", ["#003087", "#FFB81C"]], ["CGY", "Calgary Flames", ["#C8102E", "#F1BE48"]],
+    ["CAR", "Carolina Hurricanes", ["#CE1126", "#A4A9AD", "#000000"]], ["CHI", "Chicago Blackhawks", ["#CF0A2C", "#000000", "#FFD100"]],
+    ["COL", "Colorado Avalanche", ["#6F263D", "#236192", "#A2AAAD"]], ["CBJ", "Columbus Blue Jackets", ["#002654", "#CE1126", "#A4A9AD"]],
+    ["DAL", "Dallas Stars", ["#006847", "#8F8F8C", "#111111"]], ["DET", "Detroit Red Wings", ["#CE1126", "#FFFFFF"]],
+    ["EDM", "Edmonton Oilers", ["#FF4C00", "#041E42"]], ["FLA", "Florida Panthers", ["#C8102E", "#041E42", "#B9975B"]],
+    ["LAK", "Los Angeles Kings", ["#111111", "#A2AAAD"]], ["MIN", "Minnesota Wild", ["#154734", "#A6192E", "#EAAA00"]],
+    ["MTL", "Montreal Canadiens", ["#AF1E2D", "#192168"]], ["NSH", "Nashville Predators", ["#FFB81C", "#041E42"]],
+    ["NJD", "New Jersey Devils", ["#CE1126", "#000000"]], ["NYI", "New York Islanders", ["#00539B", "#F47D30"]],
+    ["NYR", "New York Rangers", ["#0038A8", "#CE1126"]], ["OTT", "Ottawa Senators", ["#C52032", "#C2912C", "#000000"]],
+    ["PHI", "Philadelphia Flyers", ["#F74902", "#000000"]], ["PIT", "Pittsburgh Penguins", ["#FCB514", "#000000"]],
+    ["SJS", "San Jose Sharks", ["#006D75", "#EA7200", "#000000"]], ["SEA", "Seattle Kraken", ["#99D9D9", "#E9072B", "#001628"]],
+    ["STL", "St. Louis Blues", ["#002F87", "#FCB514", "#041E42"]], ["TBL", "Tampa Bay Lightning", ["#002868", "#FFFFFF"]],
+    ["TOR", "Toronto Maple Leafs", ["#00205B", "#FFFFFF"]], ["UTA", "Utah Mammoth", ["#69B3E7", "#010101", "#FFFFFF"]],
+    ["VAN", "Vancouver Canucks", ["#00205B", "#00843D"]], ["VGK", "Vegas Golden Knights", ["#B4975A", "#333F42", "#C8102E"]],
+    ["WSH", "Washington Capitals", ["#C8102E", "#041E42"]], ["WPG", "Winnipeg Jets", ["#004C97", "#AC162C", "#041E42"]],
+  ];
+  const BASE = {
+    dark: { bg: "#0d1424", card: "#121b30", card2: "#0f1729", line: "#22304d" },
+    light: { bg: "#f7f9fc", card: "#ffffff", card2: "#f2f5fa", line: "#dde3ee" },
+  };
+  const rgbOf = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const hexOf = (c) => "#" + c.map((v) => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, "0")).join("");
+  const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+  const lum = (c) => { const l = c.map((v) => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; });
+    return .2126 * l[0] + .7152 * l[1] + .0722 * l[2]; };
+  const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
+  function hsl(c) {
+    const [r, g, b] = c.map((v) => v / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+    if (!d) return [0, 0, l];
+    const s = d / (1 - Math.abs(2 * l - 1));
+    const h = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return [h * 60, s, l];
+  }
+  function fromHsl([h, s, l]) {
+    const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2;
+    const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+    return [r, g, b].map((v) => (v + m) * 255);
+  }
+  // Move a color's lightness away from the surfaces until it reaches `min` contrast with every one.
+  function readable(c, surfaces, min, mode) {
+    const [h, s, l0] = hsl(c), dir = mode === "dark" ? 1 : -1;
+    for (let l = l0; l >= 0 && l <= 1; l += dir * .01) {
+      const out = fromHsl([h, s, l]); if (surfaces.every((bg) => contrast(out, bg) >= min)) return out;
+    }
+    return mode === "dark" ? [255, 255, 255] : [0, 0, 0];
+  }
+  const chromatic = (c) => { const [, s, l] = hsl(c); return s >= .2 && l > .08 && l < .92; };
+  const hueGap = (a, b) => { const d = Math.abs(hsl(a)[0] - hsl(b)[0]) % 360; return Math.min(d, 360 - d); };
+  // CSS variables for one team in one mode: tinted surfaces plus two readable accents.
+  function teamVars(colors, mode) {
+    const cs = colors.map(rgbOf), base = Object.fromEntries(Object.entries(BASE[mode]).map(([k, v]) => [k, rgbOf(v)]));
+    const c1 = cs.find(chromatic) || cs[0];
+    const c2 = cs.find((c) => c !== c1 && chromatic(c) && hueGap(c, c1) >= 35) || cs.find((c) => c !== c1) || c1;
+    const t = mode === "dark" ? 1 : .5, tint = chromatic(c1) ? c1 : base.bg;
+    const bg = mix(base.bg, tint, .08 * t), card = mix(base.card, tint, .07 * t), card2 = mix(base.card2, tint, .07 * t);
+    const line = mix(base.line, tint, .16 * t);
+    const a1 = readable(c1, [bg, card, card2], 4.6, mode), a2 = readable(c2, [bg, card, card2], 4.6, mode);  // 4.6: margin for hex rounding
+    return { "--bg": hexOf(bg), "--card": hexOf(card), "--card-2": hexOf(card2), "--line": hexOf(line),
+      "--accent": hexOf(a1), "--accent-2": hexOf(a2), "--logo-c": hexOf(a1),
+      "--glow": `rgba(${a1.map(Math.round).join(",")},${mode === "dark" ? .18 : .12})`,
+      "--field-a": a1.map(Math.round).join(","), "--field-b": a2.map(Math.round).join(",") };
+  }
+  /*THEME-END*/
   let theme = store.get("suede.theme") === "light" ? "light" : "dark";
-  function applyTheme() { if (theme === "light") document.documentElement.dataset.theme = "light"; else delete document.documentElement.dataset.theme; field.recolor(); }
+  let team = TEAMS.some((x) => x[0] === store.get("suede.team")) ? store.get("suede.team") : "";
+  const THEMED = Object.keys(teamVars(TEAMS[0][2], "dark"));
+  function applyTheme() {
+    const root = document.documentElement;
+    if (theme === "light") root.dataset.theme = "light"; else delete root.dataset.theme;
+    const t = TEAMS.find((x) => x[0] === team), vars = t ? teamVars(t[2], theme) : null;
+    THEMED.forEach((k) => (vars ? root.style.setProperty(k, vars[k]) : root.style.removeProperty(k)));
+    const link = document.querySelector('link[rel="icon"]');   // tab icon follows the accent
+    if (link) link.href = link.href.replace(/fill='%23[0-9a-fA-F]{6}' font-family/, `fill='%23${getComputedStyle(root).getPropertyValue("--accent").trim().slice(1)}' font-family`);
+    field.recolor();
+  }
   function applyCalm() { document.body.classList.toggle("calm", calm); field.setCalm(calm); }
 
   // ---------- reactive ascii field ----------
@@ -351,16 +443,16 @@
 
   // ---------- sections ----------
   const AREAS = [
-    { id: "overview", label: "OVERVIEW", desc: "where the project stands", unlocked: true },
-    { id: "data", label: "DATA VAULT", desc: "16 seasons, quality-checked", unlocked: true },
-    { id: "xg", label: "EXPECTED GOALS", desc: "the shot-quality model, held-out", unlocked: !!D.xg },
-    { id: "experiments", label: "EXPERIMENTS", desc: "every logged run, with confidence intervals", unlocked: !!D.experiments,
-      need: "Phase 2-4 results: experiments run on held-out seasons with bootstrap confidence intervals." },
-    { id: "games", label: "GAME EXPLORER", desc: "held-out predictions, game by game", unlocked: !!D.predictions,
-      need: "held-out predictions from the Phase 2 baselines." },
-    { id: "calc", label: "WHAT-IF CALCULATOR", desc: "move the dials, watch the odds", unlocked: !!D.model,
-      need: "a trained model with exported coefficients (Baseline B)." },
-    { id: "settings", label: "SETTINGS", desc: "theme, effects", unlocked: true, meta: true },
+    { id: "overview", label: "THE SHORT VERSION", desc: "what this is, and how well it works", unlocked: true },
+    { id: "experiments", label: "MODEL SCOREBOARD", desc: "every model we tried, graded on games it never saw", unlocked: !!D.experiments,
+      need: "graded model results." },
+    { id: "xg", label: "SHOT QUALITY", desc: "how likely each shot was to go in", unlocked: !!D.xg },
+    { id: "data", label: "THE DATA", desc: "16 seasons of games, and how we checked them", unlocked: true },
+    { id: "games", label: "GAME EXPLORER", desc: "predictions, game by game", unlocked: !!D.predictions,
+      need: "saved game-by-game predictions." },
+    { id: "calc", label: "WHAT-IF CALCULATOR", desc: "change the inputs, watch the odds move", unlocked: !!D.model,
+      need: "a finished model exported for the calculator." },
+    { id: "settings", label: "SETTINGS", desc: "team colors, light or dark, effects", unlocked: true, meta: true },
   ];
   const explorable = AREAS.filter((a) => !a.meta);
   let found = new Set((store.get("suede.found") || "").split(",").filter((x) => explorable.some((a) => a.id === x && a.unlocked)));
@@ -467,24 +559,43 @@
 
   const RENDER = {
     overview(body) {
-      const latest = D.xg ? D.xg.rows[D.xg.rows.length - 1] : null;
-      const tiles = [["Regular-season games", fmt(total), `${S[0].label} to ${S[S.length - 1].label}`],
-        ["Seasons processed", `${processed.length}/${S.length}`, "quality-checked, published"],
-        ["Raw data downloaded", pct((pbp + sh) / (2 * total), 0), "play-by-play + shift charts"],
-        latest ? ["xG log loss", latest.xg.toFixed(4), `held-out ${latest.label}`] : ["xG log loss", "-", "not evaluated yet"]];
-      const PH = [["0", "Data discovery", "done"], ["1", "Dataset and features", "wip"], ["2", "Baselines", "done"],
-                  ["3", "Model families", "todo"], ["4", "Experiments", "todo"], ["5", "Market backtest", "deferred"]];
-      const ico = { done: ["[x]", "done", "done"], wip: ["[~]", "wip", "in progress"], todo: ["[ ]", "", "not started"], deferred: ["[-]", "", "deferred: no odds"] };
-      body.innerHTML = `<p class="sub">Every number here is read from files on disk when the page is built. Sections without real results stay locked.</p>` +
+      // headline numbers: the best usable model on the test seasons vs always picking the home team
+      const test = D.experiments ? D.experiments.rows.filter((r) => r.period === "test") : [];
+      const best = test.filter((r) => r.kind === "main" && r.experiment !== "baseline_a").sort((a, b) => a.log_loss - b.log_loss)[0];
+      const home = test.find((r) => r.experiment === "baseline_a");
+      const span = best ? String(best.seasons).split("-").map((x) => `${x.slice(0, 4)}-${x.slice(6, 8)}`).join(" to ") : "";
+      const tiles = [
+        best ? ["Our best model picks the winner", pct(best.accuracy), `${fmt(best.n_games)} games it never saw (${span})`] : ["Our best model", "-", "not graded yet"],
+        home ? ["Always picking the home team", pct(home.accuracy), "the no-skill benchmark"] : null,
+        best ? ["Prediction error (lower is better)", (+best.log_loss).toFixed(3), "a 50/50 guess on every game scores 0.693"] : null,
+        ["Games in the data", fmt(total), `every regular season, ${S[0].label} to ${S[S.length - 1].label}`],
+      ].filter(Boolean);
+      const PH = [["Find the data sources", "done"], ["Build the dataset and stats", "wip"], ["Simple benchmark models", "done"],
+                  ["Try machine-learning models", "done"], ["Combine and fine-tune", "todo"], ["Compare against betting odds", "deferred"]];
+      const ico = { done: ["[x]", "done", "done"], wip: ["[~]", "wip", "in progress"], todo: ["[ ]", "", "not started"], deferred: ["[-]", "", "on hold: no odds data"] };
+      body.innerHTML = `<p class="sub">This project estimates the chance that the home team wins an NHL regular-season game, using only what was known before puck drop. ` +
+        `Every model is graded on seasons it was never built on, so the results show how it would do on games it hasn't seen.</p>` +
         `<div class="tiles">${tiles.map(([k, v, s]) => `<div class="tile"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="s">${esc(s)}</div></div>`).join("")}</div>` +
-        `<div class="grid2"><div class="card"><h3>Download progress</h3><div id="progress"></div></div>` +
-        `<div class="card"><h3>Phases</h3><ol class="phases">${PH.map(([n, name, st]) =>
-          `<li><span class="ph-ico ${ico[st][1]}">${ico[st][0]}</span><span>Phase ${n} &middot; ${esc(name)}</span><span class="chip">${ico[st][2]}</span></li>`).join("")}</ol></div></div>`;
+        `<div class="grid2"><div class="card"><h3>In plain words</h3><ul class="plain">` +
+        `<li>Hockey is close to a coin flip. Even good models rarely pick much more than 60% of winners.</li>` +
+        `<li>We grade the stated chances, not just the picks: games given a 70% chance should be won about 7 times in 10.</li>` +
+        `<li>Shot quality is what matters most. Knowing which players are in the lineup helps a little more.</li>` +
+        `<li>Still unknown: whether this beats the betting odds. We have no historical odds data yet, and nothing here is betting advice.</li></ul></div>` +
+        `<div class="card"><h3>Progress</h3><ol class="phases">${PH.map(([name, st], i) =>
+          `<li><span class="ph-ico ${ico[st][1]}">${ico[st][0]}</span><span>${i + 1}. ${esc(name)}</span><span class="chip">${ico[st][2]}</span></li>`).join("")}</ol></div></div>` +
+        `<div class="grid2" style="margin-top:14px"><div class="card"><h3>Words used on this site</h3><dl class="gloss">` +
+        `<dt>Prediction error</dt><dd>How far the stated chances were from what happened, averaged over games (statisticians call it log loss). Lower is better.</dd>` +
+        `<dt>Expected goals (xG)</dt><dd>The chance a shot goes in, judged from where and how it was taken.</dd>` +
+        `<dt>Test seasons</dt><dd>2018-19 to 2025-26. Models are finalized before these results are looked at, so they work like an exam.</dd>` +
+        `<dt>Development seasons</dt><dd>2012-13 to 2017-18, used to build and tune models.</dd>` +
+        `<dt>95% range</dt><dd>Where a model's true score likely falls, given the luck in a few thousand games.</dd>` +
+        `<dt>Upper bound</dt><dd>A test that uses information only certain at puck drop (like the real starting goalie). It shows the most we could gain, not a usable model.</dd>` +
+        `</dl></div><div class="card"><h3>Data downloaded</h3><div id="progress"></div></div></div>`;
       const w = $("progress").getBoundingClientRect().width, n = Math.max(12, Math.min(60, Math.floor(w / 8.2)));
-      $("progress").innerHTML = [["Play-by-play", pbp], ["Shift charts", sh]].map(([k, c]) =>
+      $("progress").innerHTML = [["Play-by-play (every shot, goal, penalty)", pbp], ["Shift charts (who was on the ice)", sh]].map(([k, c]) =>
         `<div style="margin:6px 0 12px"><div class="prog-head"><span>${k}</span><span class="mono">${fmt(c)} / ${fmt(total)}</span></div>
          <div class="prog" tabindex="0" data-tip="${esc(`${k}: ${fmt(c)} of ${fmt(total)} games (${pct(c / total)})`)}">${asciiBar(c / total, n)}</div></div>`).join("") +
-        `<div class="prog">goalie data (bulk): <span class="fl">complete</span>, all ${S.length} seasons</div>`;
+        `<div class="prog">goalie stats: <span class="fl">complete</span>, all ${S.length} seasons</div>`;
     },
 
     data(body) {
@@ -493,15 +604,21 @@
         ["Season", (s) => s.season, (s) => esc(s.label)],
         ["Games", (s) => s.games, (s) => fmt(s.games)],
         ["Downloaded", dl, (s) => { const k = Math.round(dl(s) * 10); return `<span class="mini">${"#".repeat(k)}${".".repeat(10 - k)}</span>${pct(dl(s), 0)}`; }],
-        ["Goals", (s) => s.goals_match, (s) => (s.processed ? pct(s.goals_match) : null)],
-        ["Starters", (s) => s.two_starters, (s) => (s.processed ? pct(s.two_starters) : null)],
-        ["Shift flags", (s) => s.shifts_flagged, (s) => (s.processed ? (s.shifts_flagged ? `<span class="flag">${s.shifts_flagged}</span>` : "0") : null)],
-        ["Shots w/ xy per game", (s) => s.shots_xy_per_game, (s) => (s.processed ? s.shots_xy_per_game.toFixed(1) : null)],
-        ["Home win %", (s) => s.home_win_rate, (s) => pct(s.home_win_rate)],
+        ["Goals add up", (s) => s.goals_match, (s) => (s.processed ? pct(s.goals_match) : null)],
+        ["Both goalies known", (s) => s.two_starters, (s) => (s.processed ? pct(s.two_starters) : null)],
+        ["Bad shift charts", (s) => s.shifts_flagged, (s) => (s.processed ? (s.shifts_flagged ? `<span class="flag">${s.shifts_flagged}</span>` : "0") : null)],
+        ["Shots per game", (s) => s.shots_xy_per_game, (s) => (s.processed ? s.shots_xy_per_game.toFixed(1) : null)],
+        ["Home team won", (s) => s.home_win_rate, (s) => pct(s.home_win_rate)],
       ];
       let sortCol = 0, sortDir = -1;
-      body.innerHTML = `<p class="sub">One row per regular season; click a column to sort. <b>Goals</b>: games where play-by-play goals equal the final score. ` +
-        `<b>Starters</b>: games with exactly two starting goalies. <b>Shift flags</b>: shift charts failing the team time-on-ice check (features skip their shift-based stats).</p>` +
+      body.innerHTML = `<p class="sub">Everything comes from the NHL's public game data: a log of every shot, goal and penalty, plus shift charts showing who was on the ice. ` +
+        `Before any model sees a season, it's checked for gaps. One row per season; click a column to sort.</p>` +
+        `<div class="card" style="margin-bottom:14px"><dl class="gloss">` +
+        `<dt>Goals add up</dt><dd>Games where the goals in the shot log match the final score.</dd>` +
+        `<dt>Both goalies known</dt><dd>Games where the starting goalie of each team is recorded.</dd>` +
+        `<dt>Bad shift charts</dt><dd>Games whose shift chart doesn't add up to a full game. Their player stats are skipped.</dd>` +
+        `<dt>Shots per game</dt><dd>Unblocked shots per game with a recorded location (what the shot-quality model needs).</dd>` +
+        `<dt>Home team won</dt><dd>How often the home team won, overtime and shootouts included.</dd></dl></div>` +
         `<div class="card tbl-wrap"><table class="data" id="dq"></table></div>`;
       const draw = () => {
         const key = COLS[sortCol][1];
@@ -517,17 +634,19 @@
     },
 
     xg(body) {
-      const SERIES = [["xG model", "xg", "--s1", "#"], ["Distance + angle", "distance", "--s2", "="], ["Constant rate", "constant", "--s3", ":"]];
+      const SERIES = [["Our shot model", "xg", "--s1", "#"], ["Distance and angle only", "distance", "--s2", "="], ["Same chance for every shot", "constant", "--s3", ":"]];
       const R = D.xg.rows, max = Math.max(...R.flatMap((r) => SERIES.map(([, k]) => r[k])));
-      body.innerHTML = `<p class="sub">Log loss per shot on each <b>held-out season</b>; each season's model is trained only on earlier seasons. Lower is better; bars start at zero.</p>` +
+      body.innerHTML = `<p class="sub">Expected goals (xG) is the chance that a shot goes in, judged from where and how it was taken: distance, angle, shot type, rebounds and more. ` +
+        `A 0.10 xG shot goes in about 1 time in 10. Adding up a team's xG shows how many goals its chances were worth, which usually predicts future results better than actual goals do.</p>` +
+        `<p class="sub">Each season below was predicted by a model built only on earlier seasons. Bars show prediction error per shot: <b>shorter is better</b>.</p>` +
         `<div class="card"><div class="legend">${SERIES.map(([n, , c, g]) => `<span><span class="sw" style="--c:var(${c})">${g}</span>${esc(n)}</span>`).join("")}</div>` +
-        R.slice().reverse().map((r) => `<div class="season-group"><div class="season-head"><b>Held-out ${esc(r.label)}</b><span>trained on ${esc(r.train)}</span>` +
-          `<span>${fmt(r.n_test)} shots</span><span class="chip" tabindex="0" data-tip="Sum of predicted xG divided by actual goals in ${esc(r.label)}. 1.000 means calibrated in total.">total xG / goals ${r.xg_over_goals.toFixed(3)}</span></div>` +
-          SERIES.map(([n, k, c, g]) => `<div class="bar-row" tabindex="0" data-tip="${esc(`${n}\nheld-out ${r.label}: log loss ${r[k].toFixed(4)}\n${fmt(r.n_test)} shots`)}">` +
+        R.slice().reverse().map((r) => `<div class="season-group"><div class="season-head"><b>${esc(r.label)} season</b><span>built on ${esc(r.train)}</span>` +
+          `<span>${fmt(r.n_test)} shots</span><span class="chip" tabindex="0" data-tip="Goals the model expected in ${esc(r.label)}, divided by goals actually scored. 1.000 means it got the total exactly right.">expected / actual goals ${r.xg_over_goals.toFixed(3)}</span></div>` +
+          SERIES.map(([n, k, c, g]) => `<div class="bar-row" tabindex="0" data-tip="${esc(`${n}\n${r.label}: prediction error ${r[k].toFixed(4)}\n${fmt(r.n_test)} shots`)}">` +
             `<span class="lab">${esc(n)}</span><span class="bar-track"><span class="bar-fill" style="--c:var(${c})" data-w="${(100 * r[k] / max).toFixed(2)}" data-tex="${g.repeat(140)}"></span></span>` +
             `<span class="val">${r[k].toFixed(4)}</span></div>`).join("") + "</div>").join("") +
         `<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--ink-2)">Table view</summary><div class="tbl-wrap"><table class="data" style="margin-top:8px">` +
-        `<thead><tr><th>Held-out season</th><th>Trained on</th><th>Shots</th><th>xG</th><th>Distance</th><th>Constant</th><th>xG / goals</th></tr></thead><tbody>${
+        `<thead><tr><th>Season</th><th>Built on</th><th>Shots</th><th>Our shot model</th><th>Distance and angle</th><th>Same chance</th><th>Expected / actual goals</th></tr></thead><tbody>${
           R.map((r) => `<tr><td>${esc(r.label)}</td><td>${esc(r.train)}</td><td>${fmt(r.n_test)}</td><td>${r.xg.toFixed(4)}</td><td>${r.distance.toFixed(4)}</td><td>${r.constant.toFixed(4)}</td><td>${r.xg_over_goals.toFixed(3)}</td></tr>`).join("")}</tbody></table></div></details>` +
         `<div style="margin-top:8px;font-size:12px;color:var(--muted)">source: results/xg_eval.csv, modified ${esc(D.xg.modified)}</div></div>`;
       const bars = body.querySelectorAll(".bar-fill");
@@ -536,61 +655,78 @@
 
     experiments(body) {
       const rows = D.experiments.rows;
-      const periods = [...new Set(rows.map((r) => r.period))].sort();
-      let period = periods.includes("test") ? "test" : periods[0];
+      const periods = [...new Set(rows.map((r) => r.period))].sort().reverse();   // test first
+      const PERIOD = { test: "Test seasons", dev: "Development seasons" };
+      let period = periods.includes("test") ? "test" : periods[0], all = false;
+      const lab = (x) => `${String(x).slice(0, 4)}-${String(x).slice(6, 8)}`;   // 20122013 -> 2012-13
       const draw = () => {
-        const R = rows.filter((r) => r.period === period).sort((a, b) => a.log_loss - b.log_loss);
+        const inPeriod = rows.filter((r) => r.period === period);
+        const R = inPeriod.filter((r) => all || r.kind !== "detail").sort((a, b) => a.log_loss - b.log_loss);
+        const hidden = inPeriod.length - inPeriod.filter((r) => r.kind !== "detail").length;
         const lo = Math.min(...R.map((r) => r.log_loss_lo)), hi = Math.max(...R.map((r) => r.log_loss_hi));
         const pad = (hi - lo) * 0.06, a = lo - pad, b = hi + pad, W = innerWidth < 620 ? 30 : 46;
         const pos = (v) => Math.max(0, Math.min(W - 1, Math.round(((v - a) / (b - a)) * (W - 1))));
-        const ci = (r) => {   // ascii interval: ----[===|===]----
+        const ci = (r) => {   // ascii range: ----[===|===]----
           const cells = Array(W).fill("-"), l = pos(r.log_loss_lo), h = pos(r.log_loss_hi), m = pos(r.log_loss);
           for (let i = l; i <= h; i++) cells[i] = "=";
           cells[l] = "["; cells[h] = "]"; cells[m] = "|";
           return esc(cells.join("")).replace(/(\[[=|]*\])/, "<b>$1</b>");
         };
-        const lab = (x) => `${String(x).slice(0, 4)}-${String(x).slice(6, 8)}`;   // 20122013 -> 2012-13
         const seasons = R.length ? String(R[0].seasons).split("-").map(lab).join(" to ") : "";
         $("ex-body").innerHTML =
-          `<div class="sub" style="margin-bottom:10px">Split: <b>${esc(period)}</b> period, seasons ${esc(seasons)}; ${esc(R[0] ? R[0].split : "")}. ` +
-          `Bars show log loss with a 95% day-block bootstrap interval; lower is better. Overlapping intervals are not a paired test: see the paired comparisons in the notes.</div>` +
+          `<div class="sub" style="margin-bottom:10px"><b>${esc(PERIOD[period] || period)}</b>, ${esc(seasons)}, ${R[0] ? fmt(R[0].n_games) : 0} games. ` +
+          (period === "test" ? "These are the real exam: every model here was finalized before its test results were looked at. "
+                             : "These seasons were used to build and tune the models, so their scores are a little optimistic. ") +
+          `Best first. The <b>|</b> marks each model's prediction error and the brackets its 95% range; further left is better.</div>` +
           `<div class="forest" role="list">` + R.map((r) => {
-            const leaky = String(r.goalie_variant) === "actual";
-            return `<div class="fr${leaky ? " leaky" : ""}" role="listitem" tabindex="0" data-tip="${esc(
-              `${r.experiment} (${r.period})\nlog loss ${(+r.log_loss).toFixed(5)} [${(+r.log_loss_lo).toFixed(5)}, ${(+r.log_loss_hi).toFixed(5)}]\n` +
-              `Brier ${(+r.brier).toFixed(5)}  ECE ${(+r.ece).toFixed(4)}  accuracy ${(100 * r.accuracy).toFixed(1)}%\n` +
-              `${r.model}${r.feature_groups && r.feature_groups !== "-" ? " on " + r.feature_groups : ""}\nn = ${fmt(r.n_games)} games` +
-              (r.log_loss_excl_2020_21 !== "" ? `\nexcl. 2020-21: ${(+r.log_loss_excl_2020_21).toFixed(5)}` : ""))}">` +
-              `<span class="nm">${esc(r.experiment)}${leaky ? '<span class="chip lock">leaky</span>' : ""}</span>` +
+            const upper = r.kind === "upper";
+            return `<div class="fr${upper ? " leaky" : ""}" role="listitem" tabindex="0" data-tip="${esc(
+              `${r.name}\n${r.what}\nprediction error ${(+r.log_loss).toFixed(4)} (95% range ${(+r.log_loss_lo).toFixed(4)} to ${(+r.log_loss_hi).toFixed(4)})\n` +
+              `picked the winner in ${(100 * r.accuracy).toFixed(1)}% of ${fmt(r.n_games)} games` +
+              (upper ? "\nupper bound: uses information only certain at puck drop" : "") + `\ntechnical name: ${r.experiment}`)}">` +
+              `<span class="nm">${esc(r.name)}${upper ? '<span class="chip lock">upper bound</span>' : ""}</span>` +
               `<span class="ci">${ci(r)}</span><span class="v">${(+r.log_loss).toFixed(4)}</span></div>`;
           }).join("") +
-          `<div class="fr axis" aria-hidden="true"><span></span><span class="ci">${esc(a.toFixed(3) + " ".repeat(Math.max(1, W - a.toFixed(3).length - b.toFixed(3).length)) + b.toFixed(3))}</span><span></span></div></div>` +
+          `<div class="fr axis" aria-hidden="true"><span>prediction error</span><span class="ci">${esc(a.toFixed(3) + " ".repeat(Math.max(1, W - a.toFixed(3).length - b.toFixed(3).length)) + b.toFixed(3))}</span><span></span></div></div>` +
+          `<div class="note">Small differences matter here: 0.001 is a real gain in hockey. Overlapping ranges don't always mean a tie, because the project notes also compare models game by game.</div>` +
+          (hidden || all ? `<div class="opt" style="padding-bottom:0"><div class="d">${all ? "Showing" : "Hiding"} ${hidden} tuning and check runs.</div>` +
+            `<button class="btn" type="button" id="ex-all">${all ? "hide them" : "show them"}</button></div>` : "") +
           `<details style="margin-top:12px"><summary style="cursor:pointer;color:var(--ink-2)">Table view</summary><div class="tbl-wrap"><table class="data" style="margin-top:8px">` +
-          `<thead><tr><th>Run</th><th>Model</th><th>Groups</th><th>Goalie</th><th>n</th><th>Log loss</th><th>95% CI</th><th>Brier</th><th>ECE</th><th>Acc.</th></tr></thead><tbody>` +
-          R.map((r) => `<tr><td>${esc(r.experiment)}</td><td>${esc(r.model)}</td><td>${esc(r.feature_groups)}</td><td>${esc(r.goalie_variant)}</td><td>${fmt(r.n_games)}</td>` +
-            `<td>${(+r.log_loss).toFixed(5)}</td><td>${(+r.log_loss_lo).toFixed(5)} to ${(+r.log_loss_hi).toFixed(5)}</td><td>${(+r.brier).toFixed(5)}</td>` +
-            `<td>${(+r.ece).toFixed(4)}</td><td>${(100 * r.accuracy).toFixed(1)}%</td></tr>`).join("") + `</tbody></table></div></details>`;
+          `<thead><tr><th>Model</th><th>What it uses</th><th>Games</th><th>Prediction error</th><th>95% range</th><th>Picked the winner</th><th>Technical name</th></tr></thead><tbody>` +
+          R.map((r) => `<tr><td>${esc(r.name)}${r.kind === "upper" ? " (upper bound)" : ""}</td><td style="text-align:left">${esc(r.what)}</td><td>${fmt(r.n_games)}</td>` +
+            `<td>${(+r.log_loss).toFixed(4)}</td><td>${(+r.log_loss_lo).toFixed(4)} to ${(+r.log_loss_hi).toFixed(4)}</td>` +
+            `<td>${(100 * r.accuracy).toFixed(1)}%</td><td class="mono">${esc(r.experiment)}</td></tr>`).join("") + `</tbody></table></div></details>`;
         $("ex-seg").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.v === period)));
+        const t = $("ex-all"); if (t) t.addEventListener("click", () => { all = !all; draw(); });
       };
-      body.innerHTML = `<div class="opt" style="padding-top:0"><div class="d">${rows.length} runs logged in results/experiments.csv. Accuracy is shown but never used to pick models.</div>` +
-        `<div class="seg" id="ex-seg">${periods.map((p) => `<button type="button" data-v="${esc(p)}">${esc(p)}</button>`).join("")}</div></div>` +
+      body.innerHTML = `<div class="opt" style="padding-top:0"><div class="d">Every model is graded on its <b>prediction error</b>: how far its stated chances were from what happened. ` +
+        `Lower is better, and a 50/50 guess on every game scores 0.693. "Picked the winner" is shown too, but it ignores how confident each pick was.</div>` +
+        `<div class="seg" id="ex-seg">${periods.map((p) => `<button type="button" data-v="${esc(p)}">${esc(PERIOD[p] || p)}</button>`).join("")}</div></div>` +
         `<div class="card" id="ex-body"></div>`;
       $("ex-seg").addEventListener("click", (e) => { const x = e.target.closest("button"); if (x) { period = x.dataset.v; draw(); } });
       draw();
     },
 
     settings(body) {
+      const dots = (cols) => `<span class="dots" aria-hidden="true">${cols.slice(0, 2).map((c) => `<i style="background:${c}"></i>`).join("")}</span>`;
       body.innerHTML = `<div class="card">
-        <div class="opt"><div><div>Theme</div><div class="d">Dark is the house look.</div></div>
+        <div class="opt"><div style="width:100%"><div>Team colors</div><div class="d">Recolor the site in your team's colors. Charts keep their own colors so they stay easy to read.</div>
+          <div class="teams" id="teams"><button type="button" data-v="" data-tip="The house colors">${dots(["#2a9fd0", "#8a72ea"])}default</button>${
+          TEAMS.map(([ab, name, cols]) => `<button type="button" data-v="${ab}" data-tip="${esc(name)}" aria-label="${esc(name)}">${dots(cols)}${ab}</button>`).join("")}</div>
+          <div class="note">Colors are for decoration only. This project isn't affiliated with the NHL or any team.</div></div></div>
+        <div class="opt"><div><div>Light or dark</div><div class="d">Works with any team's colors.</div></div>
           <div class="seg" id="seg-theme"><button type="button" data-v="dark">dark</button><button type="button" data-v="light">light</button></div></div>
-        <div class="opt"><div><div>Effects</div><div class="d">${osReduced ? "Off: your system asks for reduced motion." : "Field animation, decoding text, reveals."}</div></div>
+        <div class="opt"><div><div>Effects</div><div class="d">${osReduced ? "Off: your device asks for reduced motion." : "Animated background and text effects."}</div></div>
           <div class="seg" id="seg-fx"><button type="button" data-v="on">on</button><button type="button" data-v="off">off</button></div></div>
         <div class="opt"><div><div>Discoveries</div><div class="d">${found.size} of ${explorable.length} areas explored on this device.</div></div>
           <button class="btn" type="button" id="reset">reset</button></div></div>`;
       const sync = () => {
+        $("teams").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === team)));
         $("seg-theme").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === theme)));
         $("seg-fx").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === (calm ? "off" : "on"))));
       };
+      $("teams").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; team = b.dataset.v; store.set("suede.team", team); applyTheme(); sync();
+        toast(team ? `${TEAMS.find((x) => x[0] === team)[1].toUpperCase()} COLORS` : "HOUSE COLORS"); });
       $("seg-theme").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; theme = b.dataset.v; store.set("suede.theme", theme); applyTheme(); sync(); });
       $("seg-fx").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b || osReduced) return;
         calm = b.dataset.v === "off"; store.set("suede.fx", calm ? "off" : "on"); applyCalm(); sync(); });
@@ -599,8 +735,8 @@
     },
   };
   function renderLocked(body, a) {
-    body.innerHTML = `<div class="locked-box"><pre aria-hidden="true">${esc(lockArt)}</pre><div><h3>${esc(a.label)} is locked</h3>` +
-      `<p>Unlocks when the project has ${esc(a.need)}</p><p>No placeholder numbers: this area opens itself once the real results are on disk.</p>` +
+    body.innerHTML = `<div class="locked-box"><pre aria-hidden="true">${esc(lockArt)}</pre><div><h3>${esc(a.label)} isn't ready yet</h3>` +
+      `<p>It opens once the project has ${esc(a.need)}</p><p>We don't show made-up numbers, so this area stays locked until the real results exist.</p>` +
       `<span class="chip lock">LOCKED</span></div></div>`;
   }
 

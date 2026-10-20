@@ -88,7 +88,7 @@ python -m nhlmodel.report serve        # builds site/index.html, serves http://1
 
 `site/index.html` is self-contained, so it can also be opened directly without the server. It plays like a
 game menu: arrow keys / Enter / Esc (or mouse and touch). Areas without real results stay locked
-and open themselves once those results exist; Settings has the light theme and an effects switch.
+and open themselves once those results exist. The text is written for readers without a statistics background. Settings has team color themes for all 32 NHL teams (they recolor the page, not the charts), light/dark, and an effects switch.
 
 **Skip the download:** processed tables live on the `data` branch:
 

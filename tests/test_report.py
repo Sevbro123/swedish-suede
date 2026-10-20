@@ -28,3 +28,18 @@ def test_build_embeds_real_payload(tmp_path):
     games = pd.read_parquet(repo_path("data/processed/games.parquet"))
     assert payload["data"]["total_games"] == len(games)
     assert "/*__DATA__*/" not in html
+
+
+def test_team_palettes_cover_the_32_teams():
+    rows = re.findall(r'\["([A-Z]{3})", "[^"]+", \[((?:"#[0-9A-Fa-f]{6}",? ?)+)\]\]', TEMPLATE.read_text())
+    assert len(rows) == 32 and len({ab for ab, _ in rows}) == 32
+
+
+def test_run_info_names_and_kinds():
+    from nhlmodel.report.build import run_info
+
+    assert run_info("baseline_b")["kind"] == "main"
+    assert run_info("lu_b_leaky")["kind"] == "upper"
+    assert run_info("baseline_b_leaky_actual")["kind"] == "upper"
+    tuned = run_info("p3_logreg_C0.1")
+    assert tuned["kind"] == "detail" and "p3_logreg_C0.1" in tuned["name"]

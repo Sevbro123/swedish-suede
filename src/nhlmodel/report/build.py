@@ -1,4 +1,4 @@
-"""Build and serve the local retro-terminal front end.
+"""Build and serve the front end (a retro game-menu page of the project's results).
 
     python -m nhlmodel.report build          # -> site/index.html (self-contained)
     python -m nhlmodel.report serve [--port 8000]   # build, then serve on 127.0.0.1 only
@@ -51,6 +51,9 @@ def data_status(cfg) -> dict:
         }
         if q_path.exists():
             q = pd.read_parquet(q_path)
+            # the quality table records what was downloaded, so builds without the raw cache still count it
+            row["pbp_downloaded"] = max(row["pbp_downloaded"], int(q["has_pbp"].astype(bool).sum()))
+            row["shifts_downloaded"] = max(row["shifts_downloaded"], int(q["has_shifts"].astype(bool).sum()))
             row.update({
                 "goals_match": round(float(q["pbp_goals_match"].astype(float).mean()), 4),
                 "two_starters": round(float((q["n_starters"] == 2).mean()), 4),
@@ -79,6 +82,45 @@ def xg_eval() -> dict | None:
     }
 
 
+# Plain-language names for the runs a visitor should see first. kind: "main" (shown by default),
+# "upper" (uses information only known at puck drop: an upper bound, never a usable model),
+# "detail" (tuning and diagnostic runs, behind a toggle).
+RUN_INFO = {
+    "baseline_a": ("Always pick the home team", "Gives every game the league's usual home win chance. The bar to clear.", "main"),
+    "baseline_b": ("Simple model", "Five inputs: shot quality, starting goalie, rest days, home ice.", "main"),
+    "baseline_b_leaky_actual": ("Simple model, real goalie", "Uses the goalie who actually started, which is only certain at puck drop.", "upper"),
+    "p3_logreg_C0.001": ("Full model", "The simple model's method, given all ~140 stats we track.", "main"),
+    "p3_rf_leaf200_sqrt": ("Random forest", "A tree-based machine-learning model on the same ~140 stats.", "main"),
+    "p3_lgbm_l2_lr0.02_n300": ("Gradient boosting", "Another tree-based machine-learning model on the same stats.", "main"),
+    "adj_b_sa": ("Simple model + score-adjusted shots", "Discounts shots by teams that were trailing (they shoot more).", "main"),
+    "lu_b": ("Simple model + expected lineup", "Adds ratings of the players expected to dress (those who played the previous game).", "main"),
+    "lu_b_leaky": ("Simple model + real lineup", "Uses the lineup that actually played, which is only certain at puck drop.", "upper"),
+    "lu_logreg_full_C0.001": ("Full model + expected lineup", "All ~140 stats plus ratings of the players expected to dress.", "main"),
+}
+_DETAIL_PREFIX = {
+    "baseline_b_C": "Simple model, tuning",
+    "baseline_b_abl_no_": "Simple model without",
+    "baseline_b_projected": "Simple model, projected goalie",
+    "p3_logreg": "Full model, tuning",
+    "p3_rf": "Random forest, tuning",
+    "p3_lgbm": "Gradient boosting, tuning",
+    "adj_": "Score/arena adjustment check",
+    "lu_": "Player lineup check",
+}
+
+
+def run_info(experiment: str) -> dict:
+    if experiment in RUN_INFO:
+        name, what, kind = RUN_INFO[experiment]
+    else:
+        prefix = next((p for p in _DETAIL_PREFIX if experiment.startswith(p)), None)
+        name = f"{_DETAIL_PREFIX[prefix]} ({experiment})" if prefix else experiment
+        what, kind = "Tuning or diagnostic run.", "detail"
+    if "leaky" in experiment and kind != "upper":
+        kind = "upper"
+    return {"name": name, "what": what, "kind": kind}
+
+
 def experiments() -> dict | None:
     """Latest logged row per run (the log is append-only, so reruns keep their history)."""
     p = repo_path("results/experiments.csv")
@@ -89,7 +131,10 @@ def experiments() -> dict | None:
             "n_games", "log_loss", "log_loss_lo", "log_loss_hi", "brier", "ece", "accuracy", "log_loss_excl_2020_21",
             "notes", "date_run"]
     df = df[keep].fillna("")
-    return {"rows": df.to_dict(orient="records")}
+    rows = df.to_dict(orient="records")
+    for r in rows:
+        r.update(run_info(r["experiment"]))
+    return {"rows": rows}
 
 
 def git_rev() -> str:
