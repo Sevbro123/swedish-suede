@@ -134,7 +134,9 @@ def cmd_update(cfg, client: CachedClient, days: float, lineup_hours: float, now:
     for g in soon.itertuples():
         roster = pd.DataFrame(parse_roster(nhl.play_by_play(client, g.game_id, snapshot=snap)))
         n = roster.groupby("team_id").size() if len(roster) else pd.Series(dtype=int)
-        ok = len(n) == 2 and (n >= u["min_lineup_players"]).all()
+        # rosterSpots first lists each team's full roster (22-23 players, scratches included) about 80 min
+        # before puck drop, then trims to the 20 who dress shortly before it: only the trimmed list counts
+        ok = len(n) == 2 and n.between(u["min_lineup_players"], u["max_lineup_players"]).all()
         print(f"  lineup {g.away_abbrev}@{g.home_abbrev}: {'confirmed' if ok else 'not posted yet'}")
         if ok:
             keep = lineups[lineups["game_id"] != g.game_id] if len(lineups) else lineups

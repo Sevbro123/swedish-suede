@@ -18,7 +18,8 @@ seasons:
 update:
   final_settle_hours: 24   # per-game data becomes permanent once a game has been final this long
   game_length_hours: 3     # start time + this = approximate final time
-  min_lineup_players: 18   # a posted lineup counts as confirmed once each team lists this many
+  min_lineup_players: 18   # a posted lineup counts as confirmed once each team lists 18-20 players
+  max_lineup_players: 20   # (longer lists are the full roster, scratches included, posted earlier)
 
 flags:
   # Seasons kept in the data but flagged so evaluation can be reported with and without them.
