@@ -23,6 +23,7 @@ from pathlib import Path
 import pandas as pd
 
 from ..config import load_config, repo_path
+from .nhl import latest_snapshot
 from .parse import parse_goalie_games, parse_pbp, parse_roster, parse_shifts
 
 RAW = {"pbp": "nhl_web/pbp", "shifts": "nhl_stats/shifts"}
@@ -33,12 +34,15 @@ def _read(path: Path):
 
 
 def _load(raw_dir: Path, kind: str, gid: int):
-    p = raw_dir / RAW[kind] / str(gid // 1000000) / f"{gid}.json.gz"
+    """The permanent copy if present, else the newest snapshot (games final for less than a day)."""
+    key = f"{RAW[kind]}/{gid // 1000000}/{gid}"
+    p = raw_dir / f"{key}.json.gz"
     if p.exists():
         return _read(p)
     if p.with_name(f"{gid}.404").exists():
         return "404"
-    return None
+    snap = latest_snapshot(raw_dir, key)
+    return _read(snap) if snap else None
 
 
 def _pbp_goals_match(ev: list[dict], g) -> bool:
@@ -105,6 +109,8 @@ def process_season(raw_dir: Path, out_dir: Path, games: pd.DataFrame, allow_part
         raise RuntimeError(f"{season}: {n} games have raw documents not yet downloaded")
 
     goalie_path = raw_dir / "nhl_stats" / "goalie_games" / f"{season}_2.json.gz"
+    if not goalie_path.exists():  # current season: newest dated copy
+        goalie_path = latest_snapshot(raw_dir, f"nhl_stats/goalie_games/{season}_2") or goalie_path
     ids = {r.game_id: (r.home_team_id, r.away_team_id) for r in games.itertuples()}
     goalies = parse_goalie_games(_read(goalie_path)["data"], ids) if goalie_path.exists() else []
     starters = pd.Series([r["game_id"] for r in goalies if r["starter"]]).value_counts()

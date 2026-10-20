@@ -26,5 +26,9 @@ def test_actual_starter_columns_are_marked_leaky(tables):
 
 
 def test_features_and_labels_cover_the_same_games(tables):
+    """Every labelled game has features; the only unlabelled feature rows are upcoming games."""
     feats, labels = tables
-    assert feats["game_id"].is_unique and set(feats["game_id"]) == set(labels["game_id"])
+    assert feats["game_id"].is_unique and set(labels["game_id"]) <= set(feats["game_id"])
+    up = repo_path("data/processed/upcoming.parquet")
+    upcoming = set(pd.read_parquet(up)["game_id"]) if up.exists() else set()
+    assert set(feats["game_id"]) - set(labels["game_id"]) <= upcoming

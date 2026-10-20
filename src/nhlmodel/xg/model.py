@@ -1,6 +1,6 @@
 """Expected-goals model on unblocked shot attempts, trained strictly time-forward.
 
-    python -m nhlmodel.xg.model [--config configs/xg.yaml]
+    python -m nhlmodel.xg.model [--config configs/xg.yaml] [--season 20262027]
 
 For each season S, the model is fit only on seasons < S and then scores S's shots, so a shot's
 xG never depends on its own season or later. The first season in the data has no xG (burn-in).
@@ -156,16 +156,21 @@ def ece(y: np.ndarray, p: np.ndarray, bins: int = 20) -> float:
     return err / len(p)
 
 
-def run(cfg: dict[str, Any], tag: str | None = None, write_scores: bool = True) -> pd.DataFrame:
+def run(cfg: dict[str, Any], tag: str | None = None, write_scores: bool = True, only: int | None = None) -> pd.DataFrame:
     """Score every season with a model fit on earlier seasons. ``tag`` names a variant: its report goes to
-    results/xg_eval_<tag>.csv and, unless ``write_scores``, shot scores are not written."""
+    results/xg_eval_<tag>.csv and, unless ``write_scores``, shot scores are not written. ``only`` scores
+    just that season (the current one, after ``cli update``) and leaves the report untouched."""
     proc = repo_path(cfg["processed_dir"])
     seasons = sorted(int(p.stem) for p in (proc / "events").glob("*.parquet"))
+    if only is not None:
+        keep = [t for t in seasons if t < only][-cfg["train_window_seasons"]:] if cfg.get("train_window_seasons") \
+            else [t for t in seasons if t < only]
+        seasons = keep + [only]
     shots = {s: shot_features(pd.read_parquet(proc / "events" / f"{s}.parquet")) for s in seasons}
     out_dir = proc / "xg"
     out_dir.mkdir(parents=True, exist_ok=True)
     report = []
-    for s in seasons:
+    for s in ([only] if only is not None else seasons):
         train_seasons = [t for t in seasons if t < s][-cfg["train_window_seasons"]:] if cfg.get("train_window_seasons") else [t for t in seasons if t < s]
         if not train_seasons:
             continue
@@ -196,6 +201,8 @@ def run(cfg: dict[str, Any], tag: str | None = None, write_scores: bool = True) 
         )
         print({k: (round(v, 4) if isinstance(v, float) else v) for k, v in report[-1].items()}, flush=True)
     rep = pd.DataFrame(report)
+    if only is not None:
+        return rep
     res = repo_path("results")
     res.mkdir(exist_ok=True)
     rep.to_csv(res / (f"xg_eval_{tag}.csv" if tag else "xg_eval.csv"), index=False)
@@ -207,11 +214,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--config", default="configs/xg.yaml")
     ap.add_argument("--window", type=int, help="train on the last N seasons only (overrides config)")
     ap.add_argument("--tag", help="variant name: writes results/xg_eval_<tag>.csv and no shot scores")
+    ap.add_argument("--season", type=int, help="score only this season (e.g. the current one); report untouched")
     args = ap.parse_args(argv)
     cfg = load_config(args.config)
     if args.window:
         cfg["train_window_seasons"] = args.window
-    run(cfg, tag=args.tag, write_scores=args.tag is None)
+    run(cfg, tag=args.tag, write_scores=args.tag is None, only=args.season)
     return 0
 
 

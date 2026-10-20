@@ -145,7 +145,48 @@ def starter_candidates(gg: pd.DataFrame, games: pd.DataFrame, pool_games: int = 
                     "started_prev_and_b2b": int(s[i - 1] == c) * b2b,
                     "label": int(s[i] == c),
                 })
+    rows += _next_game_candidates(st, games, pool_games)
     return pd.DataFrame(rows)
+
+
+def _next_game_candidates(st: pd.DataFrame, games: pd.DataFrame, pool_games: int, max_games: int = 3) -> list[dict]:
+    """Candidates for a team's games after its last known start that have no starter yet: the next game
+    (not played) and any just-played game the bulk goalie table hasn't caught up with. Same features,
+    computed from the team's known starts; ``label`` is NaN. Adds nothing for historical data, where
+    every team's last game has a starter."""
+    sides = pd.concat([games.assign(team_id=games["home_team_id"]), games.assign(team_id=games["away_team_id"])])
+    started = set(zip(st["game_id"], st["team_id"]))
+    rows = []
+    for team, h in st.groupby("team_id", sort=False):
+        mine = sides[sides["team_id"] == team].sort_values("start_time_utc")
+        later = mine[mine["start_time_utc"] > h["start_time_utc"].max()]
+        later = later[~later["game_id"].map(lambda g: (g, team) in started).astype(bool)].head(max_games)
+        if later.empty:
+            continue
+        s, d = h["player_id"].tolist(), pd.to_datetime(h["local_date"]).tolist()
+        past = s[-pool_games:]
+        days = pd.to_datetime(mine["local_date"]).tolist()
+        for g in later.itertuples():
+            day = pd.Timestamp(g.local_date)
+            k = mine["game_id"].tolist().index(g.game_id)
+            b2b = int(k > 0 and (day - days[k - 1]).days == 1)  # previous game on the schedule, played or not
+            for c in dict.fromkeys(reversed(past)):
+                streak = 0
+                for p in reversed(past):
+                    if p != c:
+                        break
+                    streak += 1
+                last_idx = max(j for j in range(len(s)) if s[j] == c)
+                rows.append({
+                    "game_id": g.game_id, "team_id": team, "season": g.season, "player_id": c,
+                    "started_prev": int(s[-1] == c), "streak": min(streak, 10),
+                    "share_last3": past[-3:].count(c) / len(past[-3:]),
+                    "share_last10": past[-10:].count(c) / len(past[-10:]),
+                    "days_since_start": min((day - d[last_idx]).days, 30), "b2b_second": b2b,
+                    "started_prev_and_b2b": int(s[-1] == c) * b2b,
+                    "label": np.nan,
+                })
+    return rows
 
 
 def starter_probabilities(cands: pd.DataFrame, seed: int = 0) -> pd.DataFrame:
@@ -184,13 +225,17 @@ def goalie_features(gg: pd.DataFrame, games: pd.DataFrame, cfg: dict[str, Any]) 
 
     actual = gg[gg["starter"].astype(bool)][["game_id", "team_id", "player_id"]].rename(
         columns={"player_id": "actual_goalie_id"})
-    out = actual.merge(sched, on="game_id", how="left")
-    q = out[["start_time_utc", "season"]].assign(player_id=out["actual_goalie_id"])
+    act = actual.merge(sched, on="game_id", how="left")
+    q = act[["start_time_utc", "season"]].assign(player_id=act["actual_goalie_id"])
     r = ratings_asof(state, q, cfg)
     for c in RATING_COLS:
-        out[f"actual_goalie_{c}"] = r[c]
+        act[f"actual_goalie_{c}"] = r[c]
 
     cands = starter_probabilities(starter_candidates(gg, games, cfg["candidate_pool_games"]), cfg.get("seed", 0))
+    # every team-game with a starter, plus each team's next game if it hasn't been played
+    keys = pd.concat([act[["game_id", "team_id"]], cands[["game_id", "team_id"]]]).drop_duplicates()
+    out = keys.merge(act.drop(columns=["season", "start_time_utc"]), on=["game_id", "team_id"], how="left")
+    out = out.merge(sched, on="game_id", how="left")
     cands = cands.merge(sched.drop(columns="season"), on="game_id", how="left")
     cr = ratings_asof(state, cands[["start_time_utc", "season", "player_id"]], cfg)
     cands = pd.concat([cands, cr], axis=1)

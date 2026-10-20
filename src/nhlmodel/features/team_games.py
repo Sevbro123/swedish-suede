@@ -103,6 +103,12 @@ def build_team_games(events: pd.DataFrame, games: pd.DataFrame, xg: pd.DataFrame
         for c in [c for c in tg.columns if c.startswith("xg")]:
             tg[c] = tg[c].fillna(0.0).where(tg["game_id"].isin(scored))
 
+    # scheduled games not played yet (rows exist so features can be built for them): no stats, not zeros
+    pending = ~tg["game_id"].isin(set(ev["game_id"]))
+    if pending.any():
+        tg[num] = tg[num].astype("float64")
+        tg.loc[pending, num] = np.nan
+
     t = _state_seconds(events)
     tg = tg.merge(t, left_on="game_id", right_index=True, how="left")
     tg["toi_5v5_s"] = tg["t_5v5"]
@@ -112,4 +118,5 @@ def build_team_games(events: pd.DataFrame, games: pd.DataFrame, xg: pd.DataFrame
     if adjust is not None:
         adj = adjusted_counts(ev, cols, tg, games, adjust)
         tg = tg.merge(adj, on=["game_id", "team_id"], how="left", validate="one_to_one")
+        tg.loc[pending.to_numpy(), [c for c in adj.columns if c not in ("game_id", "team_id")]] = np.nan
     return tg.sort_values(["start_time_utc", "game_id", "is_home"]).reset_index(drop=True)

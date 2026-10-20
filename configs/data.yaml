@@ -12,7 +12,13 @@ http:
 seasons:
   first: 20102011          # first season with play-by-play shot coordinates (verified in Phase 0)
   last: 20252026           # last completed season
+  current: 20262027        # in progress: brought up to date by `cli update`
   game_types: [2]          # 2 = regular season only (decision: playoffs excluded)
+
+update:
+  final_settle_hours: 24   # per-game data becomes permanent once a game has been final this long
+  game_length_hours: 3     # start time + this = approximate final time
+  min_lineup_players: 18   # a posted lineup counts as confirmed once each team lists this many
 
 flags:
   # Seasons kept in the data but flagged so evaluation can be reported with and without them.

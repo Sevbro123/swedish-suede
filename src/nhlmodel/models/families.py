@@ -105,12 +105,23 @@ class _Isotonic:
 CALIBRATORS = {"platt": _Platt, "isotonic": _Isotonic}
 
 
+def actual_lineup(frame: pd.DataFrame) -> pd.DataFrame:
+    """Lineup columns filled from the actual (``leaky_``) lineup: the posted lineup at puck drop."""
+    f = frame.copy()
+    for c in [c for c in f.columns if c.startswith(("home_leaky_lineup_", "away_leaky_lineup_"))]:
+        f[c.replace("leaky_", "", 1)] = f[c]
+    return f
+
+
 def make_family(cfg: dict[str, Any]):
-    """fit_predict(train, test) for walk_forward."""
+    """fit_predict(train, test) for walk_forward. ``lineup: actual`` trains and predicts with the actual
+    lineup in the lineup columns (an upper bound in backtests; deployable once lineups are posted)."""
     calib = cfg.get("calibration", "none")
     n_cal = cfg.get("calib_games", 1500)
 
     def fit_predict(train: pd.DataFrame, test: pd.DataFrame) -> np.ndarray:
+        if cfg.get("lineup") == "actual":
+            train, test = actual_lineup(train), actual_lineup(test)
         feats = cfg.get("features", "full")
         names = full_feature_names(train, adjusted=feats == "full_adjusted", lineup=feats == "full_lineup")
         train = train.sort_values("start_time_utc")

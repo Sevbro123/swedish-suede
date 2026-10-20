@@ -1,0 +1,9 @@
+id: lu_logreg_full_actual_C0.001
+notes: "Full matrix + ACTUAL lineup (leaky upper bound in backtests; the live model once lineups are posted)."
+model:
+  type: logreg
+  params:
+    C: 0.001
+  features: full_lineup
+  lineup: actual
+  calibration: none

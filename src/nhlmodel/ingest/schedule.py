@@ -34,15 +34,19 @@ def _parse_game(g: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def season_games(c: CachedClient, season: int, game_types: Iterable[int] = (2,)) -> pd.DataFrame:
-    """Walk the season's schedule week by week from its start date to its regular-season end date."""
+def season_games(c: CachedClient, season: int, game_types: Iterable[int] = (2,), snapshot: str | None = None,
+                 through: date | None = None) -> pd.DataFrame:
+    """Walk the season's schedule week by week from its start date to its regular-season end date
+    (or ``through``, for the current season). ``snapshot`` fetches weeks as dated copies."""
     meta = nhl.season_meta(c, season)
     start = date.fromisoformat(meta["startDate"][:10])
     end = date.fromisoformat(meta["regularSeasonEndDate"][:10])
+    if through is not None:
+        end = min(end, through)
     rows: dict[int, dict[str, Any]] = {}
     d = start
     while d <= end:
-        week = nhl.schedule_week(c, d.isoformat())
+        week = nhl.schedule_week(c, d.isoformat(), snapshot)
         for day in week["gameWeek"]:
             for g in day["games"]:
                 if g["season"] == season and g["gameType"] in set(game_types):
@@ -67,6 +71,18 @@ def finalize(df: pd.DataFrame) -> pd.DataFrame:
     done["decided_in"] = done["last_period_type"].map({"REG": "REG", "OT": "OT", "SO": "SO"})
     done["local_date"] = [local_date(t, off) for t, off in zip(done["start_time_utc"], done["venue_utc_offset"])]
     return done.reset_index(drop=True)
+
+
+UPCOMING_STATES = {"FUT", "PRE"}
+
+
+def upcoming(df: pd.DataFrame, now: pd.Timestamp, days: float) -> pd.DataFrame:
+    """Scheduled games that haven't started, starting within ``days`` of ``now``. No outcome columns."""
+    t = df["start_time_utc"]
+    up = df[df["game_state"].isin(UPCOMING_STATES) & (df["schedule_state"] == "OK") & (t >= now)
+            & (t <= now + pd.Timedelta(days=days))].copy()
+    up["local_date"] = [local_date(t, off) for t, off in zip(up["start_time_utc"], up["venue_utc_offset"])]
+    return up.drop(columns=["home_score", "away_score", "last_period_type"]).reset_index(drop=True)
 
 
 def local_date(start_utc: pd.Timestamp, utc_offset: str | None) -> date:

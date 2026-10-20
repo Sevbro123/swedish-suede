@@ -114,6 +114,11 @@ def team_strength(team_games: pd.DataFrame, cfg: dict[str, Any]) -> pd.DataFrame
         k = sh["pseudo_games"]
         s_grp = tg.groupby(["franchise_id", "season"], sort=False)
         cum = s_grp[base].cumsum() - tg[base]  # sums over this season's earlier games
+        pending = tg["corsi_for"].isna() if "corsi_for" in tg else pd.Series(False, index=tg.index)
+        if pending.any():  # a game not played yet has no stats of its own to subtract
+            filled = tg[base].fillna(0)
+            cum_f = filled.groupby([tg["franchise_id"], tg["season"]], sort=False).cumsum() - filled
+            cum.loc[pending] = cum_f.loc[pending]
         n_prev = out["games_played_season"]
         prior = _previous_season_prior(tg, base, sh["regress_to_prior"])
         league_now = _league_asof(tg, base)

@@ -6,6 +6,7 @@ Writes
     data/processed/features.parquet   one row per game; pre-game information only (no outcome columns)
     data/processed/labels.parquet     game_id, season, home_win, decided_in, plus evaluation flags
 
+Upcoming games (data/processed/upcoming.parquet, from ``cli update``) get feature rows but no labels.
 Keeping labels in a separate file means the feature table cannot carry the outcome by construction;
 models join the two on game_id. Goalie features come in three variants (actual / projected /
 expected); see features/goalies.py. The *actual* variant reads each game's post-game starter flag
@@ -45,11 +46,29 @@ def _lineups(games: pd.DataFrame, events: pd.DataFrame, xg: pd.DataFrame, season
         ev = events[events["game_id"].isin(set(sh["game_id"]))]
         pgs.append(player_games(ev, sh, xs, _read_seasons("rosters", [s]), bad))
     states = player_states(pd.concat(pgs, ignore_index=True), games, cfg["players"])
-    return lineup_features(_read_seasons("rosters", seasons), games, states, cfg["players"], cfg.get("lineage", {}))
+    rosters = _read_seasons("rosters", seasons)
+    confirmed = repo_path("data/processed/lineups_confirmed.parquet")
+    if confirmed.exists():  # posted lineups of upcoming games (cli update): their leaky_ = confirmed lineup
+        c = pd.read_parquet(confirmed)
+        c = c[~c["game_id"].isin(set(rosters["game_id"])) & c["game_id"].isin(set(games["game_id"]))]
+        rosters = pd.concat([rosters, c[rosters.columns]], ignore_index=True)
+    return lineup_features(rosters, games, states, cfg["players"], cfg.get("lineage", {}))
+
+
+def _schedule(proc) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """(completed games, completed + upcoming games). Upcoming games (``cli update``) get feature rows
+    so they can be predicted; they carry no outcome and never reach the labels."""
+    done = pd.read_parquet(proc / "games.parquet")
+    up_path = proc / "upcoming.parquet"
+    if not up_path.exists():
+        return done, done
+    up = pd.read_parquet(up_path)
+    up = up[~up["game_id"].isin(set(done["game_id"]))]
+    return done, pd.concat([done, up], ignore_index=True)
 
 
 def assemble(cfg: dict, data_cfg: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
-    games = pd.read_parquet(repo_path(data_cfg["processed_dir"]) / "games.parquet")
+    done, games = _schedule(repo_path(data_cfg["processed_dir"]))
     seasons = sorted(games["season"].unique())
     events = _read_seasons("events", seasons)
     xg = _read_seasons("xg", seasons)
@@ -58,7 +77,7 @@ def assemble(cfg: dict, data_cfg: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
     tg = build_team_games(events, games, xg, cfg.get("adjust"))
     feats = build_features(games, tg, cfg)
 
-    gg = goalie_games_with_xg(xg, _read_seasons("goalie_games", seasons), games) if xg is not None else None
+    gg = goalie_games_with_xg(xg, _read_seasons("goalie_games", seasons), done) if xg is not None else None
     if gg is not None:
         gf = goalie_features(gg, games, cfg["goalies"])
         gf = gf.rename(columns={c: f"leaky_{c}" for c in gf.columns if c.startswith("actual_")})
@@ -82,7 +101,7 @@ def assemble(cfg: dict, data_cfg: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
         raise AssertionError(f"outcome columns in feature table: {sorted(leak)}")
 
     flags = data_cfg.get("flags", {})
-    labels = games[["game_id", "season", "home_win", "decided_in", "neutral_site"]].copy()
+    labels = done[["game_id", "season", "home_win", "decided_in", "neutral_site"]].copy()
     labels["flag_no_fans"] = labels["season"].isin(flags.get("no_fans", [])).astype(int)
     labels["flag_shortened"] = labels["season"].isin(flags.get("shortened", [])).astype(int)
     return feats.sort_values("start_time_utc").reset_index(drop=True), labels

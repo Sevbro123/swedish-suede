@@ -16,10 +16,20 @@ de-vigged market, with time-ordered validation and confidence intervals.
 | 3 Model families | done: see results below and `docs/phase3_choices.md` |
 | 4–5 | not started (5 deferred: no odds data) |
 
-**To do (before live/forward use):** an `update` command for the current season. It
-fetches the schedule uncached, downloads per-game data only for games that went final
-at least a day earlier (to pick up NHL stat corrections), caches those, and appends them
-to the processed tables.
+**Live use (current season).** Run once a day, and again shortly before puck drop to pick up posted lineups:
+
+```bash
+python -m nhlmodel.ingest.cli update            # schedule, new games, goalie table, lineups posted within 2 h
+python -m nhlmodel.xg.model --season 20262027   # xG for this season's shots (model trained on earlier seasons)
+python -m nhlmodel.features.build               # features, including upcoming games
+python -m nhlmodel.predict                      # P(home win) for each team's next game
+```
+
+Things that can still change (the schedule, games final for under a day, the goalie table, posted
+lineups) are stored as dated snapshots; per-game data becomes permanent once a game has been final for
+24 h, so NHL stat corrections are picked up. Shift charts the NHL hasn't posted yet (48 early 2026-27
+games so far) are retried on every update. Predictions use the full model with the projected lineup, or,
+once both teams have posted a lineup, the same model trained with actual lineups.
 
 ## Results so far
 
@@ -35,6 +45,7 @@ Log loss with 95% day-block bootstrap intervals; full table in `results/experime
 | B + projected-lineup player features | 0.6743 | 0.6655 (within noise of B) |
 | B + *actual* lineup (leaky upper bound) | 0.6741 | 0.6649 |
 | Logistic, full matrix + projected lineup (C=0.001) | 0.6722 | **0.6647** [0.6598, 0.6694] |
+| Logistic, full matrix + *actual* lineup (live model once lineups are posted) | 0.6721 | 0.6642 [0.6593, 0.6688] |
 | Logistic regression, full 140-column matrix (C=0.001) | 0.6727 [0.6683, 0.6770] | **0.6650** [0.6602, 0.6696] |
 | Random forest (leaf 200), same matrix | 0.6751 [0.6712, 0.6791] | 0.6671 [0.6628, 0.6714] |
 | LightGBM (2-leaf trees), same matrix | 0.6747 [0.6704, 0.6790] | 0.6670 [0.6628, 0.6710] |
@@ -57,6 +68,10 @@ live use could get close to that, but it can't be verified historically.
 Rolling re-selection (`docs/rolling_check.md`): re-picking the model each season on all earlier
 seasons chose the same model every time; re-picking on only the last 3 seasons was worse,
 +0.00045 [+0.00009, +0.00082]. The settings chosen on the development seasons are kept.
+
+The full model with the actual lineup beats the same model with the projected lineup on test by
+-0.00047 [-0.00086, -0.00008] (dev: -0.00012, within noise). It is an upper bound for backtests, and the
+live model once both teams post their lineups (about an hour before puck drop).
 
 ## Setup
 
