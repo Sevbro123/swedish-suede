@@ -1,0 +1,22 @@
+# Rolling re-selection check (python -m nhlmodel.eval.rolling). Fixed before any run.
+# Every candidate is run once, walk-forward, over the development and test seasons. For each test
+# season S, a rule picks the candidate with the lowest log loss on seasons before S; the picked
+# candidate's predictions for S are used. Compared (paired, test seasons) with "fixed": the same
+# candidate set picked once on the development seasons and never changed.
+id: rolling
+selection_windows:
+  expanding: null      # all evaluated seasons before S (from 2012-13)
+  last3: 3             # the 3 seasons before S
+candidates:
+  simple:
+    groups: [xg_share, goalie, rest, home]
+    C: [0.001, 0.01, 0.1, 1.0]
+  simple_lineup:
+    groups: [xg_share, goalie, rest, home, lineup]
+    C: [0.001, 0.01, 0.1, 1.0]
+  full:
+    features: full
+    C: [0.0001, 0.0003, 0.001, 0.003, 0.01]
+  full_lineup:
+    features: full_lineup
+    C: [0.0001, 0.0003, 0.001, 0.003, 0.01]

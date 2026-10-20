@@ -54,6 +54,10 @@ skaters) gave -0.00079 [-0.00177, +0.00023] (within noise; better in 6 of 8 seas
 lineup gave -0.00145 [-0.00253, -0.00031]. Lineups are public about an hour before puck drop, so
 live use could get close to that, but it can't be verified historically.
 
+Rolling re-selection (`docs/rolling_check.md`): re-picking the model each season on all earlier
+seasons chose the same model every time; re-picking on only the last 3 seasons was worse,
++0.00045 [+0.00009, +0.00082]. The settings chosen on the development seasons are kept.
+
 ## Setup
 
 ```bash
