@@ -1,0 +1,8 @@
+id: adj_b_sva
+notes: "Baseline B with score- and venue-adjusted 5v5 xG share (dev)."
+model:
+  type: logreg
+  C: 0.01
+  groups: [xg_share_sva, goalie, rest, home]
+  window: std
+  goalie_variant: expected

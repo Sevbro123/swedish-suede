@@ -17,6 +17,9 @@ from sklearn.preprocessing import StandardScaler
 # Feature groups -> per-side column templates ({w} = team-strength window, {g} = goalie variant)
 GROUPS = {
     "xg_share": ["{w}_xg_5v5_share", "{w}_xg_share"],
+    # 5v5 xG share adjusted for score (sa) or score and venue (sva); see features/adjust.py
+    "xg_share_sa": ["{w}_xg_5v5_sa_share", "{w}_xg_share"],
+    "xg_share_sva": ["{w}_xg_5v5_sva_share", "{w}_xg_share"],
     "goalie": ["{g}_goalie_gsax100_ewm"],
     "rest": ["rest_days", "back_to_back"],
 }

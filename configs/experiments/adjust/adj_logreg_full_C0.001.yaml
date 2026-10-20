@@ -1,0 +1,8 @@
+id: adj_logreg_full_C0.001
+notes: "Phase 3 logistic (C=0.001) on the full matrix plus score/venue-adjusted shot shares (dev)."
+model:
+  type: logreg
+  params:
+    C: 0.001
+  features: full_adjusted
+  calibration: none

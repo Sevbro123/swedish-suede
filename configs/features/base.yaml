@@ -2,11 +2,21 @@
 # experiments override `windows` to compare 5 / 10 / 20 games, season-to-date and EWM.
 
 # Stat pairs turned into shares F / (F + A); per-game for/against rates are emitted too.
-share_stats: [goals, sog, fenwick, corsi, goals_5v5, fenwick_5v5, corsi_5v5, xg, xg_5v5]
+share_stats: [goals, sog, fenwick, corsi, goals_5v5, fenwick_5v5, corsi_5v5, xg, xg_5v5,
+              corsi_5v5_sa, fenwick_5v5_sa, xg_5v5_sa, corsi_5v5_sva, fenwick_5v5_sva, xg_5v5_sva]
 rate_stats: [goals, sog, pp_goals, sh_goals, penalties]
 # [numerator, seconds] pairs emitted per 60 minutes: power play (own PP goals per PP minute) and
 # penalty kill (goals allowed while shorthanded per PK minute).
 per60_stats: [[pp_goals_for, toi_pp_s], [pp_goals_against, toi_pk_s]]
+
+# Score and venue adjustment of 5v5 corsi / fenwick / xG (features/adjust.py): _sa_ = score-adjusted,
+# _sva_ = score- and venue-adjusted. Coefficients come only from earlier seasons. Fixed in advance,
+# not tuned. The Phase 3 "full" matrix leaves these columns out unless a config asks for them.
+adjust:
+  score_cap: 2               # leads of 2+ pooled (and trailing by 2+)
+  score_seasons: 3           # score weights from the 3 previous seasons
+  venue_seasons: 2           # venue factors from the 2 previous seasons (~82 home games)
+  venue_pseudo_games: 40     # shrinkage toward 1: n_home / (n_home + 40)
 
 windows:
   last_n: [5, 10, 20]        # last N games of this franchise; may span seasons (see cross_season)

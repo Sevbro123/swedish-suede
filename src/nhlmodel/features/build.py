@@ -39,7 +39,7 @@ def assemble(cfg: dict, data_cfg: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
     xg = _read_seasons("xg", seasons)
     xg = xg if len(xg) else None
 
-    tg = build_team_games(events, games, xg)
+    tg = build_team_games(events, games, xg, cfg.get("adjust"))
     feats = build_features(games, tg, cfg)
 
     gg = goalie_games_with_xg(xg, _read_seasons("goalie_games", seasons), games) if xg is not None else None

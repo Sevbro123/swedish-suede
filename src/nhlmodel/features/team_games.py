@@ -17,6 +17,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from .adjust import adjusted_counts
+
 SHOTS = {"goal", "shot-on-goal", "missed-shot", "blocked-shot"}
 
 
@@ -46,9 +48,11 @@ def _state_seconds(ev: pd.DataFrame) -> pd.DataFrame:
     return s.groupby("game_id").sum()
 
 
-def build_team_games(events: pd.DataFrame, games: pd.DataFrame, xg: pd.DataFrame | None = None) -> pd.DataFrame:
+def build_team_games(events: pd.DataFrame, games: pd.DataFrame, xg: pd.DataFrame | None = None,
+                     adjust: dict | None = None) -> pd.DataFrame:
     """``xg`` (game_id, event_id, xg) adds xg_for/against and xg_5v5; absent shots count as 0,
-    and games with no xG at all (burn-in season) get NaN."""
+    and games with no xG at all (burn-in season) get NaN. ``adjust`` (see ``adjust.py``) adds
+    score-adjusted (``_sa_``) and score-and-venue-adjusted (``_sva_``) 5v5 corsi, fenwick and xG."""
     ev = events[events["period_type"] != "SO"].copy()
     if xg is not None:
         ev = ev.merge(xg[["game_id", "event_id", "xg"]], on=["game_id", "event_id"], how="left")
@@ -105,4 +109,7 @@ def build_team_games(events: pd.DataFrame, games: pd.DataFrame, xg: pd.DataFrame
     tg["toi_pp_s"] = np.where(tg["is_home"], tg["t_home_pp"], tg["t_away_pp"])
     tg["toi_pk_s"] = np.where(tg["is_home"], tg["t_away_pp"], tg["t_home_pp"])
     tg = tg.drop(columns=["t_5v5", "t_home_pp", "t_away_pp"])
+    if adjust is not None:
+        adj = adjusted_counts(ev, cols, tg, games, adjust)
+        tg = tg.merge(adj, on=["game_id", "team_id"], how="left", validate="one_to_one")
     return tg.sort_values(["start_time_utc", "game_id", "is_home"]).reset_index(drop=True)

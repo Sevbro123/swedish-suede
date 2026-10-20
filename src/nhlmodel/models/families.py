@@ -24,9 +24,12 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 EXCLUDE_PREFIXES = ("leaky_", "projected_")
+# Score/venue-adjusted shot stats (features/adjust.py) were added after Phase 3 was frozen; the
+# "full" matrix leaves them out so frozen configs reproduce, and ``features: full_adjusted`` adds them.
+ADJUSTED_TAGS = ("_sa_", "_sva_")
 
 
-def full_feature_names(frame: pd.DataFrame) -> list[str]:
+def full_feature_names(frame: pd.DataFrame, adjusted: bool = False) -> list[str]:
     """Per-side features that have both a home_ and an away_ column and are known pre-game."""
     names = []
     for c in frame.columns:
@@ -36,6 +39,8 @@ def full_feature_names(frame: pd.DataFrame) -> list[str]:
         if f"away_{base}" not in frame.columns or base == "team_id" or base.endswith("_id"):
             continue
         if base.startswith(EXCLUDE_PREFIXES):
+            continue
+        if not adjusted and any(t in base for t in ADJUSTED_TAGS):
             continue
         names.append(base)
     return sorted(names)
@@ -102,7 +107,7 @@ def make_family(cfg: dict[str, Any]):
     n_cal = cfg.get("calib_games", 1500)
 
     def fit_predict(train: pd.DataFrame, test: pd.DataFrame) -> np.ndarray:
-        names = full_feature_names(train)
+        names = full_feature_names(train, adjusted=cfg.get("features", "full") == "full_adjusted")
         train = train.sort_values("start_time_utc")
         if calib == "none":
             m = _base_model(cfg).fit(full_design(train, names), train["home_win"])
