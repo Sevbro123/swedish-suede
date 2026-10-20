@@ -74,13 +74,17 @@ def finalize(df: pd.DataFrame) -> pd.DataFrame:
 
 
 UPCOMING_STATES = {"FUT", "PRE"}
+IN_PROGRESS_STATES = {"LIVE", "CRIT"}
 
 
 def upcoming(df: pd.DataFrame, now: pd.Timestamp, days: float) -> pd.DataFrame:
-    """Scheduled games that haven't started, starting within ``days`` of ``now``. No outcome columns."""
+    """Games not final yet: those that haven't started, starting within ``days`` of ``now``, plus games in
+    progress (kept so rest days and back-to-backs for the next games are right; they are never predicted,
+    since they've started). No outcome columns."""
     t = df["start_time_utc"]
-    up = df[df["game_state"].isin(UPCOMING_STATES) & (df["schedule_state"] == "OK") & (t >= now)
-            & (t <= now + pd.Timedelta(days=days))].copy()
+    ok = df["schedule_state"] == "OK"
+    soon = df["game_state"].isin(UPCOMING_STATES) & (t >= now) & (t <= now + pd.Timedelta(days=days))
+    up = df[ok & (soon | df["game_state"].isin(IN_PROGRESS_STATES))].copy()
     up["local_date"] = [local_date(t, off) for t, off in zip(up["start_time_utc"], up["venue_utc_offset"])]
     return up.drop(columns=["home_score", "away_score", "last_period_type"]).reset_index(drop=True)
 

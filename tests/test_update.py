@@ -37,6 +37,8 @@ def test_upcoming_keeps_unstarted_games_in_window_without_outcomes():
     starts = [T0 - pd.Timedelta(hours=5), T0 + pd.Timedelta(hours=8), T0 + pd.Timedelta(days=1), T0 + pd.Timedelta(days=5)]
     up = upcoming(_sched(["OFF", "FUT", "PRE", "FUT"], starts), T0, days=2)
     assert up["game_id"].tolist() == [2, 3]
+    live = upcoming(_sched(["LIVE", "FUT", "PRE", "FUT"], starts), T0, days=2)   # in progress: kept for rest days
+    assert live["game_id"].tolist() == [1, 2, 3]
     assert not {"home_score", "away_score", "last_period_type"} & set(up.columns)
 
 
