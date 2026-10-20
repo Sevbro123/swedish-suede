@@ -137,6 +137,78 @@ def experiments() -> dict | None:
     return {"rows": rows}
 
 
+BEST_TEST_RUN = "lu_logreg_full_C0.001__test"  # the deployable model's held-out predictions
+
+
+def _ll(y, p) -> float:
+    import numpy as np
+    p = np.clip(np.asarray(p, float), 1e-15, 1 - 1e-15)
+    y = np.asarray(y, float)
+    return float(-(y * np.log(p) + (1 - y) * np.log(1 - p)).mean())
+
+
+def _record(df: pd.DataFrame) -> dict | None:
+    """Winner-pick rate and prediction error for rows with p (P(home win)) and home_win."""
+    if df.empty:
+        return None
+    y, p = df["home_win"].astype(int), df["p"].astype(float)
+    return {"n": int(len(df)), "accuracy": round(float(((p >= 0.5) == (y == 1)).mean()), 4),  # same rule as the page
+            "log_loss": round(_ll(y, p), 4), "home_rate": round(float(y.mean()), 4)}
+
+
+def live(cfg) -> dict | None:
+    """Upcoming-game predictions and this season's record (files written by ``python -m nhlmodel.live``)."""
+    proc = repo_path(cfg["processed_dir"])
+    up_path = proc / "predictions_upcoming.parquet"
+    if not up_path.exists():
+        return None
+    up = pd.read_parquet(up_path)
+    season = cfg["seasons"].get("current")
+    games = pd.read_parquet(proc / "games.parquet")
+    feats = pd.read_parquet(proc / "features.parquet", columns=[
+        "game_id", "home_rest_days", "away_rest_days", "home_back_to_back", "away_back_to_back"])
+    rows = []
+    for r in up.merge(feats, on="game_id", how="left").itertuples():
+        rows.append({"game_id": int(r.game_id), "start_utc": r.start_time_utc.isoformat(), "date": str(r.local_date),
+                     "away": r.away_abbrev, "home": r.home_abbrev, "p_home": round(float(r.p_home), 4),
+                     "lineup": r.lineup, "home_b2b": bool(r.home_back_to_back == 1), "away_b2b": bool(r.away_back_to_back == 1)})
+    out = {"updated_at": str(up["made_at"].iloc[0]) if "made_at" in up and len(up) else None,
+           "season": int(season) if season else None, "label": _season_label(int(season)) if season else None,
+           "upcoming": rows, "season_record": None, "live_record": None, "recent": []}
+    meta = games[["game_id", "local_date", "away_abbrev", "home_abbrev", "home_win"]]
+    sp = proc / "predictions_season.parquet"
+    if sp.exists():
+        done = pd.read_parquet(sp).merge(meta, on="game_id").sort_values(["local_date", "game_id"])
+        out["season_record"] = _record(done)
+        out["recent"] = [{"date": str(r.local_date), "away": r.away_abbrev, "home": r.home_abbrev,
+                          "p_home": round(float(r.p), 4), "home_win": int(r.home_win)} for r in done.tail(12).itertuples()][::-1]
+    lp = proc / "predictions_log.csv"
+    if lp.exists():
+        log = pd.read_csv(lp).rename(columns={"p_home": "p"}).merge(meta, on="game_id")
+        out["live_record"] = _record(log)
+    return out
+
+
+def explorer(cfg) -> dict | None:
+    """Every graded game: held-out test seasons plus this season so far, as compact rows."""
+    proc = repo_path(cfg["processed_dir"])
+    parts = []
+    tp = repo_path(f"results/predictions/{BEST_TEST_RUN}.parquet")
+    if tp.exists():
+        parts.append(pd.read_parquet(tp)[["game_id", "p"]])
+    sp = proc / "predictions_season.parquet"
+    if sp.exists():
+        parts.append(pd.read_parquet(sp)[["game_id", "p"]])
+    if not parts:
+        return None
+    games = pd.read_parquet(proc / "games.parquet")[["game_id", "season", "local_date", "away_abbrev", "home_abbrev",
+                                                      "away_score", "home_score", "home_win"]]
+    df = pd.concat(parts).drop_duplicates("game_id", keep="last").merge(games, on="game_id").sort_values("game_id")
+    return {"cols": ["date", "season", "away", "home", "p_home", "home_win", "score"],
+            "rows": [[str(r.local_date), int(r.season), r.away_abbrev, r.home_abbrev, round(float(r.p), 4), int(r.home_win),
+                      f"{int(r.away_score)}-{int(r.home_score)}"] for r in df.itertuples()]}
+
+
 def git_rev() -> str:
     try:
         return subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=repo_path("."), capture_output=True,
@@ -152,6 +224,8 @@ def build(cfg, out: Path) -> Path:
         "data": data_status(cfg),
         "xg": xg_eval(),
         "experiments": experiments(),
+        "live": live(cfg),
+        "predictions": explorer(cfg),
     }
     blob = json.dumps(payload).replace("</", "<\\/")  # safe inside <script>
     html = TEMPLATE.read_text().replace("/*__DATA__*/null", blob)

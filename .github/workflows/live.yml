@@ -1,0 +1,75 @@
+# Live predictions: bring the current season up to date, predict upcoming games, rebuild the site and
+# publish it to the `site` branch (Vercel deploys that branch). Runs each morning, then every 30 minutes
+# through the evening game window to pick up lineups as teams post them. Times are UTC.
+name: live predictions
+
+on:
+  schedule:
+    - cron: "15 14 * * *"
+    - cron: "10,40 22,23 * * *"
+    - cron: "10,40 0-2 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: live
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.lock
+
+      - name: Install
+        run: |
+          pip install -r requirements.lock
+          pip install -e . --no-deps
+
+      - name: Processed tables from the data branch
+        run: |
+          git fetch --depth=1 origin data
+          mkdir -p data/processed
+          git archive FETCH_HEAD processed | tar -x --strip-components=1 -C data/processed
+
+      - name: Predictions log from the last published site
+        run: |
+          if git fetch --depth=1 origin site 2>/dev/null; then
+            git show FETCH_HEAD:predictions_log.csv > data/processed/predictions_log.csv || rm -f data/processed/predictions_log.csv
+          fi
+
+      # The raw NHL response cache carries over between runs, so each run downloads only new games.
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw
+          key: nhl-raw-${{ github.run_id }}
+          restore-keys: nhl-raw-
+
+      - name: Update, predict, build
+        run: python -m nhlmodel.live
+
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: data/raw
+          key: nhl-raw-${{ github.run_id }}
+
+      - name: Publish to the site branch
+        run: |
+          cp deploy/site-vercel.json site/vercel.json
+          cd site
+          git init -q -b site
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Site build $(date -u +%Y-%m-%dT%H:%MZ) from ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" site

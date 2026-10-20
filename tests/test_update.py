@@ -75,3 +75,24 @@ def test_actual_lineup_copies_leaky_columns_into_lineup_columns():
     a = actual_lineup(f)
     assert a.loc[0, "home_lineup_on_xg_share"] == 0.55 and a.loc[0, "away_lineup_rel_xg_share"] == 0.01
     assert f.loc[0, "home_lineup_on_xg_share"] == 0.5  # input untouched
+
+
+def test_prune_snapshots_keeps_recent_folders(tmp_path):
+    from nhlmodel.live import prune_snapshots
+
+    for name in ("20261015T120000Z", "20261019T120000Z", "20261020T110000Z", "notatime"):
+        (tmp_path / "snap" / name).mkdir(parents=True)
+    assert prune_snapshots(tmp_path, 2, T0) == 1
+    assert sorted(p.name for p in (tmp_path / "snap").iterdir()) == ["20261019T120000Z", "20261020T110000Z", "notatime"]
+
+
+def test_predictions_log_keeps_the_latest_pregame_prediction():
+    from nhlmodel.live import LOG_COLS, update_log
+
+    log = pd.DataFrame([[1, "2026-10-19T14:00:00+00:00", 0.6, "projected"],
+                        [2, "2026-10-19T14:00:00+00:00", 0.4, "projected"]], columns=LOG_COLS)
+    preds = pd.DataFrame({"game_id": [2, 3], "p_home": [0.45, 0.55], "lineup": ["confirmed", "projected"]})
+    out = update_log(log, preds, T0).set_index("game_id")
+    assert list(out.index) == [1, 2, 3]
+    assert out.loc[1, "p_home"] == 0.6                      # game already started: untouched
+    assert out.loc[2, "p_home"] == 0.45 and out.loc[2, "lineup"] == "confirmed"

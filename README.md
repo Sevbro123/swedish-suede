@@ -16,7 +16,14 @@ de-vigged market, with time-ordered validation and confidence intervals.
 | 3 Model families | done: see results below and `docs/phase3_choices.md` |
 | 4–5 | not started (5 deferred: no odds data) |
 
-**Live use (current season).** Run once a day, and again shortly before puck drop to pick up posted lineups:
+**Live use (current season).** One command, run once a day and again shortly before puck drop to pick up
+posted lineups:
+
+```bash
+python -m nhlmodel.live      # update -> xG -> features -> predictions -> site/index.html
+```
+
+It runs these steps, which also work on their own:
 
 ```bash
 python -m nhlmodel.ingest.cli update            # schedule, new games, goalie table, lineups posted within 2 h
@@ -24,6 +31,13 @@ python -m nhlmodel.xg.model --season 20262027   # xG for this season's shots (mo
 python -m nhlmodel.features.build               # features, including upcoming games
 python -m nhlmodel.predict                      # P(home win) for each team's next game
 ```
+
+**Hosting.** `.github/workflows/live.yml` runs `python -m nhlmodel.live` on GitHub Actions each morning and
+every 30 minutes from 22:10 to 02:40 UTC, then force-pushes the built page to the `site` branch. Vercel deploys
+that branch: import the repo in Vercel (framework preset "Other", no build command), then set
+Settings > Git > Production Branch to `site`. The root `vercel.json` turns off deployments for every other
+branch. The predictions log (`predictions_log.csv`, the last prediction made before each game) is carried
+between runs on the `site` branch and published with the page.
 
 Things that can still change (the schedule, games final for under a day, the goalie table, posted
 lineups) are stored as dated snapshots; per-game data becomes permanent once a game has been final for
