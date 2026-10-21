@@ -17,8 +17,8 @@ de-vigged market, with time-ordered validation and confidence intervals.
 | 4 Live predictions | done: `python -m nhlmodel.live`, scheduled GitHub Action, site on Vercel (see Live use and Hosting below) |
 | 5 Betting-odds comparison | deferred: no odds data |
 
-**Live use (current season).** One command, run once a day and again shortly before puck drop to pick up
-posted lineups:
+**Live use (current season).** One command, run once a day and again in the last minutes before puck drop to
+pick up posted lineups (they post 5-15 min before it: `docs/lineup_timing.md`):
 
 ```bash
 python -m nhlmodel.live      # update -> xG -> features -> predictions -> site/index.html
@@ -33,8 +33,12 @@ python -m nhlmodel.features.build               # features, including upcoming g
 python -m nhlmodel.predict                      # P(home win) for each team's next game
 ```
 
-**Hosting.** `.github/workflows/live.yml` runs `python -m nhlmodel.live` on GitHub Actions each morning and
-hourly from 22:35 to 02:35 UTC (6 runs a day), then force-pushes the built page to the `site` branch. Vercel deploys
+**Hosting.** `.github/workflows/live.yml` runs `python -m nhlmodel.watch` on GitHub Actions: it runs
+`nhlmodel.live` and force-pushes the built page to the `site` branch (`scripts/publish_site.sh`), then stays up
+while games are due, polling the lineups of games starting within 25 minutes every minute and republishing as
+soon as one posts. A run lasts up to 5.5 h. Triggers come hourly from 13:07 to 03:07 UTC, and ones that arrive
+while a run is going wait as a single pending run, so late or dropped GitHub schedules don't leave gaps
+(`docs/lineup_timing.md`). Vercel deploys
 that branch: import the repo in Vercel (framework preset "Other", no build command), then set
 Settings > Git > Production Branch to `site`. The root `vercel.json` turns off deployments for every other
 branch. The predictions log (`predictions_log.csv`, the last prediction made before each game) is carried
@@ -53,18 +57,18 @@ site opens a page showing what pushes it toward either team.
 
 Open work, in rough priority order:
 
-1. **Check when lineups post.** The live workflow assumes teams post lineups at least ~30 minutes before
-   puck drop: evening runs are hourly at :35 UTC, so each game gets one 25-55 minutes before it starts. Not yet
-   seen live (none were posted 18 h before a game). If they post later, move the cron times in
-   `.github/workflows/live.yml` or add runs.
+1. **Lineups that post after puck drop.** Checked live on 2026-10-20 (`docs/lineup_timing.md`): dressed
+   lineups land in rosterSpots 5-15 minutes before puck drop, and for 4 of 11 games only after it. The watcher
+   catches the first kind; for the second, look for an NHL source that posts earlier. Tally a few more nights
+   from the run logs (`lineup ...: confirmed (20/20)` lines) first.
 2. **Special-teams player ratings** (PP/PK), the v2 of the 5v5 RAPM ratings now in use
    (`docs/player_ratings_choices.md`).
 3. **EDGE features** (prior-season aggregates only; in-season EDGE can't be built without leakage).
 4. **Betting-odds comparison (Phase 5).** Needs a historical odds source with usable terms. The loader and
    vig math are ready (`src/nhlmodel/odds/`).
 5. **What-if calculator** on the site is still locked (needs the model's coefficients exported).
-6. **Matinee games** (weekend/holiday afternoons) get only the 14:15 UTC prediction with expected lineups:
-   no run catches their posted lineups. Add afternoon runs if that matters.
+6. **Actions minutes.** The watcher keeps a runner up through each game window (several hours a day). Free
+   for a public repo; on a private one it would exceed the free tier.
 7. **Watch the extreme predictions.** Historically, games given under 25% were won 28% of the time
    (36 games): slightly overconfident. Check again as the live log grows.
 
