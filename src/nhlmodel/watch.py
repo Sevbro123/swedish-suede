@@ -1,6 +1,6 @@
 """Stay up through the game window and rerun the live pipeline as soon as a lineup posts.
 
-    python -m nhlmodel.watch [--hours 5.5] [--horizon 4] [--window 25] [--publish scripts/publish_site.sh]
+    python -m nhlmodel.watch [--hours 3] [--horizon 1.5] [--window 25] [--publish scripts/publish_site.sh]
 
 Runs ``nhlmodel.live`` once, then watches the games starting within ``--window`` minutes: it polls their
 play-by-play rosterSpots every minute and, when a team's dressed lineup appears, reruns the pipeline (and the
@@ -52,8 +52,8 @@ def main(argv: list[str] | None = None) -> int:
     from .ingest.http import CachedClient
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--hours", type=float, default=5.5, help="stop after this long")
-    ap.add_argument("--horizon", type=float, default=4, help="stop once no game starts within this many hours")
+    ap.add_argument("--hours", type=float, default=3, help="stop after this long")
+    ap.add_argument("--horizon", type=float, default=1.5, help="stop once no game starts within this many hours")
     ap.add_argument("--window", type=float, default=25, help="poll lineups of games starting within this many minutes")
     ap.add_argument("--publish", help="command to run after each pipeline run (e.g. scripts/publish_site.sh)")
     args = ap.parse_args(argv)

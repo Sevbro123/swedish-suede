@@ -47,9 +47,11 @@ prediction tonight, all from runs 6 to 8 minutes before puck drop.
 `python -m nhlmodel.watch` (used by `.github/workflows/live.yml`) runs the pipeline once, then stays up
 through the game window. It polls the rosterSpots of games starting within 25 minutes every minute, and
 reruns and republishes as soon as a lineup posts. A rerun takes about 2 minutes, so a lineup posted at T-6
-still makes it. One run lasts up to 5.5 h. Hourly triggers from 13:07 to 03:07 UTC queue behind a running
-watcher (GitHub keeps one pending run per concurrency group), so coverage survives dropped or late
-triggers. They also cover matinees.
+still makes it. A run stays up only while a game starts within 90 minutes, and at most 3 h (first version:
+4 h and 5.5 h, tightened on 2026-10-21 to cut idle runner time and how long a stuck run could block the
+queue). Triggers every 30 minutes from 13:07 to 03:37 UTC queue behind a running watcher (GitHub keeps one
+pending run per concurrency group), so each game gets about three chances to start a watcher in time, and
+matinees are covered.
 
 Open: a lineup that posts after puck drop (4 of 11 tonight) can't be used. Whether another NHL source posts
 lineups earlier hasn't been checked. Each run now logs per-team counts (e.g. `confirmed (20/20)`,
