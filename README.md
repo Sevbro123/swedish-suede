@@ -36,8 +36,8 @@ python -m nhlmodel.predict                      # P(home win) for each team's ne
 **Hosting.** `.github/workflows/live.yml` runs `python -m nhlmodel.watch` on GitHub Actions: it runs
 `nhlmodel.live` and force-pushes the built page to the `site` branch (`scripts/publish_site.sh`), then stays up
 while games are due, polling the lineups of games starting within 25 minutes every minute and republishing as
-soon as one posts. A run lasts up to 5.5 h. Triggers come hourly from 13:07 to 03:07 UTC, and ones that arrive
-while a run is going wait as a single pending run, so late or dropped GitHub schedules don't leave gaps
+soon as one posts. A run stays up only while a game starts within 90 minutes, and at most 3 h. Triggers come
+every 30 minutes from 13:07 to 03:37 UTC, and ones that arrive while a run is going wait as a single pending run, so late or dropped GitHub schedules don't leave gaps
 (`docs/lineup_timing.md`). Vercel deploys
 that branch: import the repo in Vercel (framework preset "Other", no build command), then set
 Settings > Git > Production Branch to `site`. The root `vercel.json` turns off deployments for every other
@@ -89,8 +89,9 @@ Done since the last list: 5v5 player ratings (PR #2) and the lineup watcher that
 4. **Betting-odds comparison (Phase 5).** Needs a historical odds source with usable terms. The loader and
    vig math are ready (`src/nhlmodel/odds/`).
 5. **What-if calculator** on the site is still locked (needs the model's coefficients exported).
-6. **Actions minutes.** The watcher keeps a runner up through each game window (several hours a day). Free
-   for a public repo; on a private one it would exceed the free tier.
+6. **Actions minutes.** The watcher keeps a runner up from about 90 minutes before the first puck drop to the
+   last one (about 4-6 hours on a full night), plus about 3 minutes per idle trigger. Free for a public repo;
+   on a private one it would exceed the free tier.
 7. **Watch the extreme predictions.** Historically, games given under 25% were won 28% of the time
    (36 games): slightly overconfident. Check again as the live log grows.
 
