@@ -140,9 +140,10 @@ def _lookup(queries: pd.DataFrame, states: pd.DataFrame) -> pd.DataFrame:
     return m.drop(columns=["state_time"])
 
 
-def lineup_features(rosters: pd.DataFrame, games: pd.DataFrame, states: pd.DataFrame,
-                    cfg: dict[str, Any], lineage: dict[int, int]) -> pd.DataFrame:
-    """Per (game_id, team_id): projected and ``leaky_`` actual lineup features."""
+def lineup_members(rosters: pd.DataFrame, games: pd.DataFrame, states: pd.DataFrame,
+                   cfg: dict[str, Any], lineage: dict[int, int]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """(sides, members): every team-game, and per team-game the skaters in its projected lineup,
+    actual lineup or regulars, with their state as of the game (``proj`` / ``actual`` / ``regular`` flags)."""
     sk = rosters[rosters["position"] != "G"]
     roster = {k: list(v) for k, v in sk.groupby(["game_id", "team_id"])["player_id"]}
     g = games[["game_id", "start_time_utc", "home_team_id", "away_team_id"]]
@@ -174,7 +175,17 @@ def lineup_features(rosters: pd.DataFrame, games: pd.DataFrame, states: pd.DataF
     m["on_xg_share"] = m["on_xg_share"].fillna(0.5)
     m["rel_xg_share"] = m["rel_xg_share"].fillna(0.0)
     m["exp_toi"] = m["exp_toi"].fillna(cfg["default_toi_s"])
+    return sides, m
 
+
+def lineup_features(rosters: pd.DataFrame, games: pd.DataFrame, states: pd.DataFrame,
+                    cfg: dict[str, Any], lineage: dict[int, int]) -> pd.DataFrame:
+    """Per (game_id, team_id): projected and ``leaky_`` actual lineup features."""
+    return lineup_features_from(*lineup_members(rosters, games, states, cfg, lineage))
+
+
+def lineup_features_from(sides: pd.DataFrame, m: pd.DataFrame) -> pd.DataFrame:
+    """``lineup_features`` from the output of ``lineup_members``."""
     out = sides[["game_id", "team_id"]].set_index(["game_id", "team_id"])
     key = ["game_id", "team_id"]
     reg_toi = m[m["regular"]].groupby(key)["exp_toi"].sum()
@@ -186,4 +197,27 @@ def lineup_features(rosters: pd.DataFrame, games: pd.DataFrame, states: pd.DataF
             out[f"{prefix}lineup_{c}"] = (L[c] * w).groupby([L["game_id"], L["team_id"]]).sum() / tot
         miss = m[m["regular"] & ~m[flag]].groupby(key)["exp_toi"].sum()
         out[f"{prefix}lineup_missing_toi_share"] = (miss.reindex(reg_toi.index, fill_value=0) / reg_toi)
+    return out.reset_index()
+
+
+def rapm_lineup_features(sides: pd.DataFrame, members: pd.DataFrame, ratings: pd.DataFrame) -> pd.DataFrame:
+    """Per (game_id, team_id): the lineup's summed RAPM ratings (``ratings/rapm.py``), projected and ``leaky_``.
+
+    Each skater's rating is the fit as of the first day of the game's month (UTC); players without
+    one count as league average (0). Weights are expected 5v5 TOI scaled to five skaters on the ice,
+    so ``rapm_off`` / ``rapm_def`` are the xG/60 the lineup should create above average / prevent
+    below average, and ``rapm_net`` is their sum.
+    """
+    m = members[["game_id", "team_id", "start_time_utc", "player_id", "proj", "actual", "exp_toi"]].copy()
+    m["month"] = m["start_time_utc"].dt.tz_convert("UTC").dt.tz_localize(None).dt.to_period("M")
+    m = m.merge(ratings[["month", "player_id", "off", "def"]], on=["month", "player_id"], how="left")
+    m[["off", "def"]] = m[["off", "def"]].fillna(0.0)
+    out = sides[["game_id", "team_id"]].set_index(["game_id", "team_id"])
+    for flag, prefix in (("proj", ""), ("actual", "leaky_")):
+        L = m[m[flag]]
+        key = [L["game_id"], L["team_id"]]
+        tot = L["exp_toi"].groupby(key).sum()
+        for c in ("off", "def"):
+            out[f"{prefix}rapm_{c}"] = 5 * (L[c] * L["exp_toi"]).groupby(key).sum() / tot
+        out[f"{prefix}rapm_net"] = out[f"{prefix}rapm_off"] + out[f"{prefix}rapm_def"]
     return out.reset_index()

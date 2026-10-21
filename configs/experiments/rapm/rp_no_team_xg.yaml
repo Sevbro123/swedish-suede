@@ -1,0 +1,8 @@
+id: rp_no_team_xg
+notes: "Projected lineup's RAPM ratings instead of team xG share (dev diagnostic)."
+model:
+  type: logreg
+  C: 0.01
+  groups: [rapm, goalie, rest, home]
+  window: std
+  goalie_variant: expected

@@ -1,0 +1,8 @@
+id: rp_b_leaky
+notes: "Baseline B + ACTUAL lineup's RAPM ratings (leaky upper bound, never selected on)."
+model:
+  type: logreg
+  C: 0.01
+  groups: [xg_share, goalie, rest, home, rapm_leaky]
+  window: std
+  goalie_variant: expected

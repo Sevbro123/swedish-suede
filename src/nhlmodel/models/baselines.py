@@ -24,6 +24,9 @@ GROUPS = {
     # lineup from player on-ice xG (features/players.py): projected (previous game) or leaky actual
     "lineup": ["lineup_on_xg_share", "lineup_rel_xg_share", "lineup_missing_toi_share"],
     "lineup_leaky": ["leaky_lineup_on_xg_share", "leaky_lineup_rel_xg_share", "leaky_lineup_missing_toi_share"],
+    # lineup's summed RAPM ratings (ratings/rapm.py), with the same missing-regulars share
+    "rapm": ["rapm_off", "rapm_def", "lineup_missing_toi_share"],
+    "rapm_leaky": ["leaky_rapm_off", "leaky_rapm_def", "leaky_lineup_missing_toi_share"],
     "rest": ["rest_days", "back_to_back"],
 }
 GOALIE_PREFIX = {"expected": "expected", "projected": "projected", "actual": "leaky_actual"}
