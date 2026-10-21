@@ -53,9 +53,31 @@ trained with actual lineups. Each prediction is also split into per-stat terms (
 the model is a standardized logistic regression, so the split is exact), and each upcoming-game card on the
 site opens a page showing what pushes it toward either team.
 
+## Progress log
+
+Where things stand as of 2026-10-21, so work can pick up from here.
+
+- **2026-10-19:** Phases 0-3 done. Logistic regression on the full feature matrix with strong shrinkage
+  (C=0.001) beat random forest and LightGBM on the test period; calibration didn't help.
+- **2026-10-20:** score/venue-adjusted 5v5 stats, lineup features from player on-ice xG, rolling
+  re-selection check (keep the dev-chosen settings), current-season updates with live predictions, the
+  Vercel site, and confirmed lineups. `features.parquet` and `labels.parquet` stopped being stored on the
+  `data` branch; every live run rebuilds them.
+- **2026-10-21, PR #1:** each upcoming-game card on the site opens a page explaining its prediction (exact
+  per-stat split of the logistic model, `explain_upcoming.parquet`).
+- **2026-10-21, PR #2:** adjusted player ratings (5v5 RAPM on xG from shift-chart stints,
+  `src/nhlmodel/ratings/`, `docs/player_ratings_choices.md`). Settings frozen on dev: λ = 300 minutes,
+  24-month half-life. Baseline B + RAPM beat Baseline B on test, so the live model switched to the full model
+  + RAPM (`rp_logreg_full` configs). Stints aren't on the `data` branch, so each Actions run rebuilds them
+  (about 1.5 min). Special-teams (PP/PK) ratings are the planned v2.
+- **2026-10-21, PR #3:** the live workflow became a lineup watcher (`python -m nhlmodel.watch`) instead of
+  fixed run times. GitHub's cron started runs hours late or dropped them, and dressed lineups post only
+  5-15 minutes before puck drop (`docs/lineup_timing.md`).
+
 ## Outstanding items
 
-Open work, in rough priority order:
+Done since the last list: 5v5 player ratings (PR #2) and the lineup watcher that replaced fixed run times
+(PR #3). Open work, in rough priority order:
 
 1. **Lineups that post after puck drop.** Checked live on 2026-10-20 (`docs/lineup_timing.md`): dressed
    lineups land in rosterSpots 5-15 minutes before puck drop, and for 4 of 11 games only after it. The watcher
