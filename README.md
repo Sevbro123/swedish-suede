@@ -15,7 +15,7 @@ de-vigged market, with time-ordered validation and confidence intervals.
 | 2 Baselines | done: see results below and `docs/eval_protocol.md` |
 | 3 Model families | done: see results below and `docs/phase3_choices.md` |
 | 4 Live predictions | done: `python -m nhlmodel.live`, scheduled GitHub Action, site on Vercel (see Live use and Hosting below) |
-| 5 Betting-odds comparison | deferred: no odds data |
+| 5 Betting-odds comparison | historical comparison deferred (no odds data); paper trading forward from 2026-10-22 (see Paper trading below) |
 
 **Live use (current season).** One command, run once a day and again in the last minutes before puck drop to
 pick up posted lineups (they post 5-15 min before it: `docs/lineup_timing.md`):
@@ -87,7 +87,16 @@ Done since the last list: 5v5 player ratings (PR #2) and the lineup watcher that
    (`docs/player_ratings_choices.md`).
 3. **EDGE features** (prior-season aggregates only; in-season EDGE can't be built without leakage).
 4. **Betting-odds comparison (Phase 5).** Needs a historical odds source with usable terms. The loader and
-   vig math are ready (`src/nhlmodel/odds/`).
+   vig math are ready (`src/nhlmodel/odds/`). Going forward, paper trading records prices instead.
+
+**Paper trading.** Each live run, and each minute the watcher polls games about to start, reads the NHL
+betting partner's current 2-way moneylines (`/v1/partner-game/US/now`, no key needed) into
+`data/processed/odds_log.csv`, which travels between runs on the `site` branch like the predictions log
+(so it is readable at the site's URL). `nhlmodel.paper` rebuilds the bets from the two logs every run: each
+game's last prediction before puck drop, at the price read in that same run, bets 1 unit on a side whose
+model chance beats the no-vig price by 3+ points; the last price before puck drop is the close (for CLV).
+Rules are in `configs/paper.yaml`; the site's Paper trading page shows bankroll, record, ROI, CLV and every
+bet.
 5. **What-if calculator** on the site is still locked (needs the model's coefficients exported).
 6. **Actions minutes.** The watcher keeps a runner up from about 90 minutes before the first puck drop to the
    last one (about 4-6 hours on a full night), plus about 3 minutes per idle trigger. Free for a public repo;
@@ -221,7 +230,8 @@ data/raw/           immutable response cache + manifest.jsonl (gitignored)
 data/processed/     derived tables, rebuildable from data/raw (gitignored)
 src/nhlmodel/
   ingest/           cached HTTP client, NHL endpoints, schedule -> games table
-  odds/             odds schema/loader, moneyline and vig math
+  odds/             odds schema/loader, moneyline and vig math, NHL partner-book prices
+  paper.py          paper trading: bets rebuilt from the predictions and odds logs, graded
   ratings/          5v5 stints and RAPM player ratings
   features/ xg/ models/ eval/ backtest/   (upcoming phases)
 tests/              unit tests (leakage, vig math, calibration, ...)

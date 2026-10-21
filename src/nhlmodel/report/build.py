@@ -289,6 +289,34 @@ def live(cfg) -> dict | None:
     return out
 
 
+def paper(cfg) -> dict | None:
+    """Paper trading: headline numbers, bankroll curve and every bet (paper_bets.csv from ``nhlmodel.live``)."""
+    from ..paper import summary
+
+    p = repo_path(cfg["processed_dir"]) / "paper_bets.csv"
+    if not p.exists():
+        return None
+    bets = pd.read_csv(p)
+    if bets.empty:
+        return None
+    rules = load_config("configs/paper.yaml")
+    placed = bets[bets["side"].fillna("") != ""].iloc[::-1]   # newest first
+
+    def num(v, d=4):
+        return None if pd.isna(v) else round(float(v), d)
+
+    rows = [{"start_utc": r.start_utc, "away": r.away, "home": r.home, "side": r.side,
+             "team": r.home if r.side == "home" else r.away, "price": int(r.price), "book": r.book,
+             "p": num(r.p_home if r.side == "home" else 1 - r.p_home),
+             "p_mkt": num(r.p_mkt_home if r.side == "home" else 1 - r.p_mkt_home),
+             "close": None if pd.isna(r.close_home_ml) else int(r.close_home_ml if r.side == "home" else r.close_away_ml),
+             "clv": num(r.clv), "lineup": r.lineup, "status": r.status, "profit": num(r.profit, 2)}
+            for r in placed.itertuples()]
+    first = str(bets["start_utc"].min())[:10]
+    return {"summary": summary(bets, rules), "rules": {k: rules[k] for k in ("bankroll", "stake", "min_edge")},
+            "since": first, "books": sorted(set(bets["book"].dropna())), "bets": rows}
+
+
 def explorer(cfg) -> dict | None:
     """Every graded game: held-out test seasons plus this season so far, as compact rows."""
     proc = repo_path(cfg["processed_dir"])
@@ -325,6 +353,7 @@ def build(cfg, out: Path) -> Path:
         "xg": xg_eval(),
         "experiments": experiments(),
         "live": live(cfg),
+        "paper": paper(cfg),
         "predictions": explorer(cfg),
     }
     blob = json.dumps(payload).replace("</", "<\\/")  # safe inside <script>

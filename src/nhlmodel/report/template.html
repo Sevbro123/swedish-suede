@@ -489,6 +489,8 @@
     { id: "overview", label: "THE SHORT VERSION", desc: "what this is, and how well it works", unlocked: true },
     { id: "upcoming", label: "UPCOMING GAMES", desc: "win chances for the next games, and this season so far",
       unlocked: !!(D.live && D.live.upcoming.length), need: "predictions for upcoming games (run python -m nhlmodel.live)." },
+    { id: "paper", label: "PAPER TRADING", desc: "the bets the model would make, and how they did", unlocked: !!D.paper,
+      need: "betting prices recorded before a game (each live run reads them)." },
     { id: "experiments", label: "MODEL SCOREBOARD", desc: "every model we tried, graded on games it never saw", unlocked: !!D.experiments,
       need: "graded model results." },
     { id: "xg", label: "SHOT QUALITY", desc: "how likely each shot was to go in", unlocked: !!D.xg },
@@ -877,6 +879,48 @@ ${say(x.pts)}`)}"><span class="lab">${esc(x.name)}</span>${bar(x.pts, maxG)}<spa
       $("gx-prev").addEventListener("click", () => { page--; draw(); });
       $("gx-next").addEventListener("click", () => { page++; draw(); });
       draw();
+    },
+
+    paper(body) {
+      const P = D.paper, S2 = P.summary, R = P.rules;
+      const ml = (v) => (v > 0 ? "+" : "") + v;
+      const signed = (v, d = 2) => (v == null ? "-" : (v > 0 ? "+" : "") + v.toFixed(d));
+      const pts = (v) => { if (v == null) return "-"; const r = Math.round(1000 * v) / 10; return (r > 0 ? "+" : "") + (r || 0).toFixed(1) + " pts"; };
+      const tiles = [
+        ["Bankroll", S2.bankroll.toFixed(2) + "u", `started at ${S2.bankroll_start}u on ${P.since}`],
+        ["Record", `${S2.won}-${S2.lost}`, `${S2.settled} settled, ${S2.open} waiting on a result`],
+        ["Return on stakes", S2.roi == null ? "-" : pct(S2.roi), `${signed(S2.profit)}u on ${S2.staked}u staked`],
+        ["Beat the closing price", S2.beat_close == null ? "-" : pct(S2.beat_close, 0), `average move ${pts(S2.avg_clv)} our way`],
+      ];
+      const c = S2.curve, W = 600, H = 120;
+      let chart = `<div class="note">The bankroll chart starts once the first bet is settled.</div>`;
+      if (c.length) {
+        const ys = [S2.bankroll_start, ...c], lo = Math.min(...ys), hi = Math.max(...ys), span = Math.max(hi - lo, 1);
+        const y = (v) => (H - 8 - ((v - lo) / span) * (H - 16)).toFixed(1), x = (i) => ((i / Math.max(ys.length - 1, 1)) * W).toFixed(1);
+        chart = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:${H}px;display:block" role="img" aria-label="Bankroll after each settled bet">` +
+          `<line x1="0" x2="${W}" y1="${y(S2.bankroll_start)}" y2="${y(S2.bankroll_start)}" stroke="var(--line)" stroke-dasharray="4 4"/>` +
+          `<polyline fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke" points="${ys.map((v, i) => `${x(i)},${y(v)}`).join(" ")}"/></svg>` +
+          `<div class="note">Bankroll after each settled bet, in units. Dashed line: the starting ${S2.bankroll_start}u.</div>`;
+      }
+      const day = (iso) => new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
+      const RES = { won: ["won", "right"], lost: ["lost", "wrong"], open: ["not started", ""], pending: ["waiting", ""] };
+      body.innerHTML = `<p class="sub">Pretend bets, no real money. Before each game the model's win chance is compared with the betting price ` +
+        `from the NHL's betting partner (${esc(P.books.join(", ") || "none yet")}), with the bookmaker's cut taken out. When our chance for a team is at least ` +
+        `${(100 * R.min_edge).toFixed(0)} points higher, we bet ${R.stake} unit on that team at that price. The bet is the last one made before puck drop, so it uses the confirmed lineup when it posts in time.</p>` +
+        `<div class="tiles">${tiles.map(([k, v, s]) => `<div class="tile"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="s">${esc(s)}</div></div>`).join("")}</div>` +
+        `<div class="card" style="margin-bottom:14px">${chart}</div>` +
+        `<div class="card" style="margin-bottom:14px"><dl class="gloss">` +
+        `<dt>Edge</dt><dd>Our win chance minus the book's, after removing the bookmaker's cut. ${S2.bets} bets out of ${S2.games_priced} priced games so far, average edge ${pts(S2.avg_edge)}.</dd>` +
+        `<dt>Closing price</dt><dd>The last price before puck drop. If the market moved toward our side after we bet, we beat the close. Over a few hundred bets this says more than the win-loss record, which is mostly luck early on.</dd>` +
+        `<dt>Unit</dt><dd>A fixed bet size. Profit is shown in units, so it reads the same whatever one unit is worth.</dd></dl></div>` +
+        `<div class="card tbl-wrap"><table class="data"><thead><tr><th>Date</th><th style="text-align:left">Game</th><th>Bet</th><th>Price</th><th>Our chance</th>` +
+        `<th>Book's chance</th><th>Close</th><th>Moved</th><th>Result</th><th>Profit</th></tr></thead><tbody>${
+          P.bets.map((b) => { const r = RES[b.status] || [b.status, ""];
+            return `<tr><td>${esc(day(b.start_utc))}</td><td style="text-align:left">${esc(b.away)} @ ${esc(b.home)}</td><td>${esc(b.team)}</td>` +
+              `<td class="mono">${esc(ml(b.price))}</td><td>${pct(b.p)}</td><td>${pct(b.p_mkt)}</td><td class="mono">${b.close == null ? "-" : esc(ml(b.close))}</td>` +
+              `<td>${b.clv == null ? "-" : esc(pts(b.clv))}</td><td class="${r[1]}">${esc(r[0])}</td><td class="mono">${b.profit == null ? "-" : esc(signed(b.profit))}</td></tr>`; }).join("")
+        }</tbody></table>${P.bets.length ? "" : `<div class="note">No game has cleared the ${(100 * R.min_edge).toFixed(0)}-point bar yet.</div>`}</div>` +
+        `<div class="note">For tracking the model only. Nothing here is betting advice.</div>`;
     },
 
     settings(body) {

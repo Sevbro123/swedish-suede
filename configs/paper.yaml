@@ -1,0 +1,6 @@
+# Paper trading: the bets the live model would make at the NHL partner book's moneylines (nhlmodel.paper).
+bankroll: 100        # starting bankroll, in units (nominal: only the profit curve is shown)
+stake: 1             # flat stake per bet, in units
+min_edge: 0.03       # bet a side when the model's win chance beats the book's no-vig chance by this much
+devig: multiplicative
+max_price_age_min: 30   # a prediction is bet only at a price read within this many minutes before it

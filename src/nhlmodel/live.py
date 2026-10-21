@@ -4,11 +4,12 @@
 
 Steps: ``cli update`` (schedule, new games, goalie table, posted lineups) -> xG for the current season
 -> features -> predictions for each team's next game -> this season's completed games re-predicted the
-backtest way (monthly refits, only earlier games) -> predictions log -> site/index.html.
+backtest way (monthly refits, only earlier games) -> predictions log -> paper bets -> site/index.html.
 
 The predictions log (data/processed/predictions_log.csv) keeps the last prediction made before each
 game's start, so the site can show the live record. It is also copied to site/ (the GitHub Action
-carries it between runs on the ``site`` branch).
+carries it between runs on the ``site`` branch). The odds log (the partner book's moneylines, read each
+run) travels the same way; the paper bets are rebuilt from the two logs every run (``nhlmodel.paper``).
 """
 from __future__ import annotations
 
@@ -49,6 +50,38 @@ def update_log(log: pd.DataFrame, preds: pd.DataFrame, now: pd.Timestamp) -> pd.
     return pd.concat([keep, new], ignore_index=True).sort_values("game_id").reset_index(drop=True)
 
 
+def record_odds(cfg, client, now: pd.Timestamp) -> int:
+    """Append the partner book's current moneylines to the odds log. Never fails the run: a missing price
+    only means no bet on that game."""
+    from .odds.partner import ODDS_COLS, append_log, fetch
+
+    path = repo_path(cfg["processed_dir"]) / "odds_log.csv"
+    log = pd.read_csv(path) if path.exists() else pd.DataFrame(columns=ODDS_COLS)
+    try:
+        new = fetch(client, now)
+    except Exception as e:  # noqa: BLE001 - odds are optional
+        print(f"odds: partner fetch failed ({e!r}), no prices this run", flush=True)
+        return 0
+    n = len(log)
+    log = append_log(log, new)
+    log.to_csv(path, index=False)
+    books = ", ".join(sorted(set(new["book"]))) or "no book"
+    print(f"odds: {len(new)} games priced ({books}), {len(log) - n} new prices", flush=True)
+    return len(new)
+
+
+def paper_trade(proc, log: pd.DataFrame, now: pd.Timestamp) -> pd.DataFrame:
+    """Rebuild the paper bets from the predictions and odds logs (``nhlmodel.paper``)."""
+    from .paper import BET_COLS, build_bets
+
+    op = proc / "odds_log.csv"
+    if not op.exists():
+        return pd.DataFrame(columns=BET_COLS)
+    games = pd.concat([pd.read_parquet(proc / "games.parquet"), pd.read_parquet(proc / "upcoming.parquet")])
+    games = games.drop_duplicates("game_id")[["game_id", "start_time_utc", "away_abbrev", "home_abbrev", "home_win"]]
+    return build_bets(log, pd.read_csv(op), games, load_config("configs/paper.yaml"), now)
+
+
 def season_so_far(cfg_path: str, season: int) -> pd.DataFrame:
     """This season's completed games, predicted as in the backtests: refit monthly on earlier games only."""
     frame = load_frame()
@@ -77,7 +110,9 @@ def main(argv: list[str] | None = None) -> int:
     now = pd.Timestamp.now(tz="UTC")
     if not args.no_fetch:
         print(f"pruned {prune_snapshots(raw, 2, now)} old snapshot folders")
-        cmd_update(cfg, CachedClient.from_config(cfg, raw), args.days, args.lineup_hours, now)
+        client = CachedClient.from_config(cfg, raw)
+        cmd_update(cfg, client, args.days, args.lineup_hours, now)
+        record_odds(cfg, client, now)
     run_xg(load_config("configs/xg.yaml"), only=season)
     fbuild.main([])
 
@@ -98,10 +133,15 @@ def main(argv: list[str] | None = None) -> int:
     if len(preds):
         log = update_log(log, preds, now)
     log.to_csv(log_path, index=False)
+    bets = paper_trade(proc, log, now)
+    bets.to_csv(proc / "paper_bets.csv", index=False)
+    print(f"paper trading: {int((bets['side'].fillna('') != '').sum())} bets on {len(bets)} priced games")
 
     out = repo_path("site")
     path = build_site(cfg, out)
-    shutil.copy(log_path, out / "predictions_log.csv")
+    for name in ("predictions_log.csv", "odds_log.csv", "paper_bets.csv"):
+        if (proc / name).exists():
+            shutil.copy(proc / name, out / name)
     print(f"wrote {path}")
     return 0
 
