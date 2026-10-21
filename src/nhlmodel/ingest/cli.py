@@ -87,7 +87,6 @@ def cmd_update(cfg, client: CachedClient, days: float, lineup_hours: float, now:
     Writes games.parquet (past seasons unchanged + current-season completed games), upcoming.parquet
     and lineups_confirmed.parquet, then processes the season. Rebuild xG / features / predictions after.
     """
-    from .parse import parse_roster
     from .process import process_season, summarize
     from .schedule import upcoming
 
@@ -132,12 +131,7 @@ def cmd_update(cfg, client: CachedClient, days: float, lineup_hours: float, now:
     path = proc / "lineups_confirmed.parquet"
     lineups = pd.read_parquet(path) if path.exists() else pd.DataFrame()
     for g in soon.itertuples():
-        roster = pd.DataFrame(parse_roster(nhl.play_by_play(client, g.game_id, snapshot=snap)))
-        n = roster.groupby("team_id").size() if len(roster) else pd.Series(dtype=int)
-        # rosterSpots first lists each team's full roster (22-23 players, scratches included) about 80 min
-        # before puck drop, then trims to the 20 who dress shortly before it: only the trimmed list counts
-        ok = len(n) == 2 and n.between(u["min_lineup_players"], u["max_lineup_players"]).all()
-        print(f"  lineup {g.away_abbrev}@{g.home_abbrev}: {'confirmed' if ok else 'not posted yet'}")
+        ok, roster = lineup_status(cfg, client, g, snap)
         if ok:
             keep = lineups[lineups["game_id"] != g.game_id] if len(lineups) else lineups
             lineups = pd.concat([keep, roster.assign(fetched_at=now)], ignore_index=True)
@@ -146,6 +140,24 @@ def cmd_update(cfg, client: CachedClient, days: float, lineup_hours: float, now:
 
     q = process_season(repo_path(cfg["raw_dir"]), proc, games[games["season"] == season], allow_partial=True)
     print(summarize(season, q))
+
+
+def lineup_status(cfg, client: CachedClient, g, snap: str) -> tuple[bool, pd.DataFrame]:
+    """Whether game ``g`` (an upcoming row) has both teams' dressed lineups posted, and the rosterSpots rows.
+
+    rosterSpots first lists each team's full roster (22-23 players, scratches included) about 80 min before
+    puck drop, then trims to the 20 who dress, usually 5-15 min before it (sometimes only after it starts):
+    only the trimmed list counts. Prints one line per game with the per-team counts.
+    """
+    from .parse import parse_roster
+
+    u = cfg["update"]
+    roster = pd.DataFrame(parse_roster(nhl.play_by_play(client, g.game_id, snapshot=snap)))
+    n = roster.groupby("team_id").size() if len(roster) else pd.Series(dtype=int)
+    ok = len(n) == 2 and n.between(u["min_lineup_players"], u["max_lineup_players"]).all()
+    counts = "/".join(str(int(n.get(t, 0))) for t in (g.away_team_id, g.home_team_id))
+    print(f"  lineup {g.away_abbrev}@{g.home_abbrev}: {'confirmed' if ok else 'not posted yet'} ({counts})", flush=True)
+    return ok, roster
 
 
 def main(argv: list[str] | None = None) -> int:
