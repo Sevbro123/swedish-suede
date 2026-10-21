@@ -1,6 +1,6 @@
 # Spec: lineup-based team strength from player ratings
 
-Status: proposed, not started. Comes after the score and venue adjustment (Phase 1 to-do).
+Status: done (5v5 v1). Choices, deviations and results: `docs/player_ratings_choices.md`.
 
 ## Why
 

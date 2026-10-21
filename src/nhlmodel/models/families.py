@@ -29,9 +29,12 @@ EXCLUDE_PREFIXES = ("leaky_", "projected_")
 ADJUSTED_TAGS = ("_sa_", "_sva_")
 # Lineup features (features/players.py), likewise added after Phase 3: ``features: full_lineup``.
 LINEUP_TAG = "lineup_"
+# Lineup RAPM ratings (ratings/rapm.py): ``features: full_rapm`` = the full_lineup matrix plus rapm_*.
+RAPM_TAG = "rapm_"
 
 
-def full_feature_names(frame: pd.DataFrame, adjusted: bool = False, lineup: bool = False) -> list[str]:
+def full_feature_names(frame: pd.DataFrame, adjusted: bool = False, lineup: bool = False,
+                       rapm: bool = False) -> list[str]:
     """Per-side features that have both a home_ and an away_ column and are known pre-game."""
     names = []
     for c in frame.columns:
@@ -45,6 +48,8 @@ def full_feature_names(frame: pd.DataFrame, adjusted: bool = False, lineup: bool
         if not adjusted and any(t in base for t in ADJUSTED_TAGS):
             continue
         if not lineup and base.startswith(LINEUP_TAG):
+            continue
+        if not rapm and base.startswith(RAPM_TAG):
             continue
         names.append(base)
     return sorted(names)
@@ -108,9 +113,57 @@ CALIBRATORS = {"platt": _Platt, "isotonic": _Isotonic}
 def actual_lineup(frame: pd.DataFrame) -> pd.DataFrame:
     """Lineup columns filled from the actual (``leaky_``) lineup: the posted lineup at puck drop."""
     f = frame.copy()
-    for c in [c for c in f.columns if c.startswith(("home_leaky_lineup_", "away_leaky_lineup_"))]:
+    for c in [c for c in f.columns if c.startswith(("home_leaky_lineup_", "away_leaky_lineup_",
+                                                    "home_leaky_rapm_", "away_leaky_rapm_"))]:
         f[c.replace("leaky_", "", 1)] = f[c]
     return f
+
+
+def _inputs(cfg: dict[str, Any], train: pd.DataFrame, test: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
+    """(train sorted by time, test, feature names), with the actual lineup swapped in if the config asks."""
+    if cfg.get("lineup") == "actual":
+        train, test = actual_lineup(train), actual_lineup(test)
+    feats = cfg.get("features", "full")
+    names = full_feature_names(train, adjusted=feats == "full_adjusted", lineup=feats in ("full_lineup", "full_rapm"),
+                               rapm=feats == "full_rapm")
+    return train.sort_values("start_time_utc"), test, names
+
+
+def explain_family(cfg: dict[str, Any]):
+    """fit_explain(train, test) -> (p, terms) for an uncalibrated logistic family: the same fit as
+    ``make_family``, plus each test game's log-odds split into additive terms.
+
+    The model is standardize -> logistic, so log-odds = intercept + sum_j coef_j * (x_j - mean_j) / scale_j
+    = [intercept - sum_j coef_j * mean_j / scale_j] + sum_j (coef_j / scale_j) * x_j. Terms use the second
+    form: x_j = 0 means "no home-minus-away difference", so a term is how far that difference moves the
+    log-odds away from evenly matched teams. ``terms`` has one row per (test game, term): ``term`` is a
+    design column (or "intercept"), ``logit`` its share of the log-odds, and ``home`` / ``away`` the raw
+    per-side values behind it.
+    """
+    if cfg["type"] != "logreg" or cfg.get("calibration", "none") != "none":
+        raise ValueError("only an uncalibrated logistic model splits into additive terms")
+
+    def fit_explain(train: pd.DataFrame, test: pd.DataFrame) -> tuple[np.ndarray, pd.DataFrame]:
+        train, test, names = _inputs(cfg, train, test)
+        m = _base_model(cfg).fit(full_design(train, names), train["home_win"])
+        X = full_design(test, names)
+        scaler, lr = m[0], m[-1]
+        w = lr.coef_[0] / scaler.scale_
+        logit = X * w
+        logit["intercept"] = lr.intercept_[0] - float(w @ scaler.mean_)
+        home = pd.DataFrame({f"d_{n}": test[f"home_{n}"].astype(float) for n in names}, index=test.index)
+        away = pd.DataFrame({f"d_{n}": test[f"away_{n}"].astype(float) for n in names}, index=test.index)
+        home["home_games_played_season"] = X["home_games_played_season"]
+        away["away_games_played_season"] = X["away_games_played_season"]
+        home["neutral_site"] = away["neutral_site"] = X["neutral_site"]
+        def long(df: pd.DataFrame, name: str) -> pd.DataFrame:
+            df = df.reindex(columns=logit.columns).assign(game_id=test["game_id"].to_numpy())
+            return df.melt(id_vars="game_id", var_name="term", value_name=name)
+
+        terms = long(logit, "logit").assign(home=long(home, "home")["home"], away=long(away, "away")["away"])
+        return m.predict_proba(X)[:, 1], terms
+
+    return fit_explain
 
 
 def make_family(cfg: dict[str, Any]):
@@ -120,11 +173,7 @@ def make_family(cfg: dict[str, Any]):
     n_cal = cfg.get("calib_games", 1500)
 
     def fit_predict(train: pd.DataFrame, test: pd.DataFrame) -> np.ndarray:
-        if cfg.get("lineup") == "actual":
-            train, test = actual_lineup(train), actual_lineup(test)
-        feats = cfg.get("features", "full")
-        names = full_feature_names(train, adjusted=feats == "full_adjusted", lineup=feats == "full_lineup")
-        train = train.sort_values("start_time_utc")
+        train, test, names = _inputs(cfg, train, test)
         if calib == "none":
             m = _base_model(cfg).fit(full_design(train, names), train["home_win"])
             return m.predict_proba(full_design(test, names))[:, 1]
