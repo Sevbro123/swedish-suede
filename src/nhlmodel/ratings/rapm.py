@@ -21,7 +21,7 @@ As-of rule (the walk-forward rule): ratings for any game in calendar month M (UT
 stints from games that started before the first day of M.
 
 Implementation: the normal equations X'WX and X'Wy are additive over stints, so they are summed
-per month once; each refit decays and adds them, then solves one sparse system.
+per month once; each refit decays and adds them, then solves one sparse system by conjugate gradient.
 """
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
-from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import cg, spsolve
 
 from .stints import AWAY, HOME
 
@@ -95,7 +95,7 @@ def fit_monthly(player_index: pd.Index, eqs: dict, cutoffs: list, lam: float,
     decay = 1.0 if halflife_months is None else 0.5 ** (1 / halflife_months)
     pen = sp.diags(np.r_[np.full(N_COV, COV_LAM), np.full(2 * P, lam)])
     months = sorted(eqs)
-    A, b = sp.csr_matrix((K, K)), np.zeros(K)
+    A, b, beta = sp.csr_matrix((K, K)), np.zeros(K), np.zeros(K)
     out = []
     cur = months[0] if months else None
     for c in sorted(cutoffs):
@@ -106,7 +106,12 @@ def fit_monthly(player_index: pd.Index, eqs: dict, cutoffs: list, lam: float,
             cur = cur + 1
         if A.nnz == 0:
             continue
-        beta = spsolve((A + pen).tocsc(), b)
+        # conjugate gradient, warm-started from the previous month's fit (a direct sparse solve gives
+        # the same ratings to ~1e-9 but takes ~2 s per refit)
+        M = (A + pen).tocsr()
+        beta, info = cg(M, b, x0=beta, rtol=1e-12, atol=0.0, maxiter=20000, M=sp.diags(1 / M.diagonal()))
+        if info != 0:
+            beta = spsolve(M.tocsc(), b)
         toi = A.diagonal()[N_COV:N_COV + P]
         seen = toi > 0
         out.append(pd.DataFrame({"month": c, "player_id": player_index[seen], "off": beta[N_COV:N_COV + P][seen],

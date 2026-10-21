@@ -96,6 +96,9 @@ RUN_INFO = {
     "lu_b": ("Simple model + expected lineup", "Adds ratings of the players expected to dress (those who played the previous game).", "main"),
     "lu_b_leaky": ("Simple model + real lineup", "Uses the lineup that actually played, which is only certain at puck drop.", "upper"),
     "lu_logreg_full_C0.001": ("Full model + expected lineup", "All ~140 stats plus ratings of the players expected to dress.", "main"),
+    "rp_b": ("Simple model + adjusted player ratings", "Rates each expected player for the chances their team creates and allows with them on the ice, adjusted for teammates and opponents.", "main"),
+    "rp_b_leaky": ("Simple model + real lineup's adjusted ratings", "Same, with the lineup that actually played, which is only certain at puck drop.", "upper"),
+    "rp_logreg_full_C0.001": ("Full model + adjusted player ratings", "The full model with expected lineup, plus the adjusted player ratings. This is the live model.", "main"),
 }
 _DETAIL_PREFIX = {
     "baseline_b_C": "Simple model, tuning",
@@ -106,6 +109,7 @@ _DETAIL_PREFIX = {
     "p3_lgbm": "Gradient boosting, tuning",
     "adj_": "Score/arena adjustment check",
     "lu_": "Player lineup check",
+    "rp_": "Adjusted player ratings check",
 }
 
 
@@ -137,7 +141,7 @@ def experiments() -> dict | None:
     return {"rows": rows}
 
 
-BEST_TEST_RUN = "lu_logreg_full_C0.001__test"  # the deployable model's held-out predictions
+BEST_TEST_RUN = "rp_logreg_full_C0.001__test"  # the deployable model's held-out predictions
 
 
 def _ll(y, p) -> float:

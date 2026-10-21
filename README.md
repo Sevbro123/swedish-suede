@@ -11,7 +11,7 @@ de-vigged market, with time-ordered validation and confidence intervals.
 | Phase | State |
 |---|---|
 | 0 Data discovery | done: [`docs/phase0_data_discovery.md`](docs/phase0_data_discovery.md) (live-verified) |
-| 1 Dataset & features | mostly done: 16 seasons ingested; xG, goalie, team-strength, situational and score/venue-adjusted features (`docs/score_venue_choices.md`), lineup features from player on-ice xG (`docs/lineup_choices.md`). Remaining: teammate/opponent-adjusted player ratings (`docs/player_ratings_spec.md`), EDGE |
+| 1 Dataset & features | mostly done: 16 seasons ingested; xG, goalie, team-strength, situational and score/venue-adjusted features (`docs/score_venue_choices.md`), lineup features from player on-ice xG (`docs/lineup_choices.md`), teammate/opponent-adjusted player ratings (RAPM, `docs/player_ratings_choices.md`). Remaining: EDGE |
 | 2 Baselines | done: see results below and `docs/eval_protocol.md` |
 | 3 Model families | done: see results below and `docs/phase3_choices.md` |
 | 4 Live predictions | done: `python -m nhlmodel.live`, scheduled GitHub Action, site on Vercel (see Live use and Hosting below) |
@@ -43,8 +43,9 @@ between runs on the `site` branch and published with the page.
 Things that can still change (the schedule, games final for under a day, the goalie table, posted
 lineups) are stored as dated snapshots; per-game data becomes permanent once a game has been final for
 24 h, so NHL stat corrections are picked up. Shift charts the NHL hasn't posted yet (48 early 2026-27
-games so far) are retried on every update. Predictions use the full model with the projected lineup, or,
-once both teams have posted a lineup, the same model trained with actual lineups.
+games so far) are retried on every update. Predictions use the full model with the projected lineup and its
+adjusted player ratings (`rp_logreg_full_C0.001`), or, once both teams have posted a lineup, the same model
+trained with actual lineups.
 
 ## Outstanding items
 
@@ -54,8 +55,8 @@ Open work, in rough priority order:
    puck drop: evening runs are hourly at :35 UTC, so each game gets one 25-55 minutes before it starts. Not yet
    seen live (none were posted 18 h before a game). If they post later, move the cron times in
    `.github/workflows/live.yml` or add runs.
-2. **Teammate/opponent-adjusted player ratings** (RAPM), the full version of `docs/player_ratings_spec.md`.
-   The quick version is in use; this should sharpen it. Special teams (PP/PK) would be a later step.
+2. **Special-teams player ratings** (PP/PK), the v2 of the 5v5 RAPM ratings now in use
+   (`docs/player_ratings_choices.md`).
 3. **EDGE features** (prior-season aggregates only; in-season EDGE can't be built without leakage).
 4. **Betting-odds comparison (Phase 5).** Needs a historical odds source with usable terms. The loader and
    vig math are ready (`src/nhlmodel/odds/`).
@@ -98,8 +99,12 @@ Log loss with 95% day-block bootstrap intervals; full table in `results/experime
 | B with score-adjusted 5v5 xG share | 0.6755 | 0.6663 (within noise of B) |
 | B + projected-lineup player features | 0.6743 | 0.6655 (within noise of B) |
 | B + *actual* lineup (leaky upper bound) | 0.6741 | 0.6649 |
-| Logistic, full matrix + projected lineup (C=0.001) | 0.6722 | **0.6647** [0.6598, 0.6694] |
-| Logistic, full matrix + *actual* lineup (live model once lineups are posted) | 0.6721 | 0.6642 [0.6593, 0.6688] |
+| Logistic, full matrix + projected lineup (C=0.001) | 0.6722 | 0.6647 [0.6598, 0.6694] |
+| Logistic, full matrix + *actual* lineup | 0.6721 | 0.6642 [0.6593, 0.6688] |
+| B + projected lineup's adjusted player ratings (RAPM) | 0.6737 | 0.6649 [0.6603, 0.6696] |
+| B + *actual* lineup's RAPM (leaky upper bound) | 0.6734 | 0.6642 |
+| Logistic, full matrix + projected lineup + RAPM (C=0.001), **live model** | 0.6719 | **0.6643** [0.6595, 0.6692] |
+| Logistic, full matrix + *actual* lineup + RAPM (live model once lineups are posted) | 0.6717 | 0.6638 [0.6588, 0.6686] |
 | Logistic regression, full 140-column matrix (C=0.001) | 0.6727 [0.6683, 0.6770] | **0.6650** [0.6602, 0.6696] |
 | Random forest (leaf 200), same matrix | 0.6751 [0.6712, 0.6791] | 0.6671 [0.6628, 0.6714] |
 | LightGBM (2-leaf trees), same matrix | 0.6747 [0.6704, 0.6790] | 0.6670 [0.6628, 0.6710] |
@@ -122,6 +127,14 @@ live use could get close to that, but it can't be verified historically.
 Rolling re-selection (`docs/rolling_check.md`): re-picking the model each season on all earlier
 seasons chose the same model every time; re-picking on only the last 3 seasons was worse,
 +0.00045 [+0.00009, +0.00082]. The settings chosen on the development seasons are kept.
+
+Adjusted player ratings (`docs/player_ratings_choices.md`): ridge RAPM on 5v5 xG from shift-chart
+stints, an offense and a defense rating per player, refit monthly, summed over the expected lineup. The
+two settings (penalty, decay of older seasons) were chosen on dev. On test, Baseline B + RAPM beats
+Baseline B by -0.00138 [-0.00268, -0.00009], the first projected-lineup feature to clear Baseline B on
+test, so the spec's adoption rule holds. Against the quick lineup features it is -0.00060 [-0.00135,
++0.00009] in Baseline B and -0.00031 [-0.00070, +0.00007] in the full model (both within noise, better in
+both periods). The live model switched to the full model + RAPM, as the frozen rule allowed.
 
 The full model with the actual lineup beats the same model with the projected lineup on test by
 -0.00047 [-0.00086, -0.00008] (dev: -0.00012, within noise). It is an upper bound for backtests, and the
@@ -180,6 +193,7 @@ data/processed/     derived tables, rebuildable from data/raw (gitignored)
 src/nhlmodel/
   ingest/           cached HTTP client, NHL endpoints, schedule -> games table
   odds/             odds schema/loader, moneyline and vig math
+  ratings/          5v5 stints and RAPM player ratings
   features/ xg/ models/ eval/ backtest/   (upcoming phases)
 tests/              unit tests (leakage, vig math, calibration, ...)
 results/            experiment log

@@ -91,3 +91,24 @@ gain is within noise in Baseline B, but its interval excludes zero in the full m
 Settings are `configs/features/base.yaml` `rapm: {lam: 300, halflife_months: 24}`. Nothing changes
 after the test results. The live model switches to `rp_logreg_full_*` only if the test-period
 comparison against `lu_logreg_full_C0.001` is not worse.
+
+## Test results (2018-19 to 2025-26, n = 9,781), run once after the freeze
+
+| Run | Test log loss | Paired vs reference |
+|---|---|---|
+| `rp_b` vs Baseline B | 0.66494 | −0.00138 [−0.00268, −0.00009], better |
+| `rp_b` vs `lu_b` | | −0.00060 [−0.00135, +0.00009], within noise |
+| `rp_b_leaky` vs Baseline B (upper bound) | 0.66424 | −0.00209 [−0.00350, −0.00069] |
+| `rp_logreg_full_C0.001` vs `lu_logreg_full_C0.001` | 0.66433 | −0.00031 [−0.00070, +0.00007], within noise |
+| `rp_logreg_full_C0.001` vs `p3_logreg_C0.001` | | −0.00067 [−0.00139, +0.00005], within noise |
+| `rp_logreg_full_actual_C0.001` vs `lu_logreg_full_actual_C0.001` | 0.66375 | −0.00042 [−0.00084, −0.00001], better |
+
+The adoption rule holds on test as well. Baseline B + RAPM clears Baseline B, which the quick lineup
+features did not (−0.00079, within noise). Against the quick version, RAPM is better in both periods,
+but by less than the noise on test. The frozen rule for the live model ("not worse") is met, so
+`predict.py` now uses `rp_logreg_full_C0.001` and, once lineups are posted,
+`rp_logreg_full_actual_C0.001`.
+
+After the test run, the solver was switched from a direct sparse solve to conjugate gradient,
+warm-started from the previous month. The ratings are unchanged (largest feature difference 2e-10)
+and the feature build is back to ~1.6 min from ~5.5.
