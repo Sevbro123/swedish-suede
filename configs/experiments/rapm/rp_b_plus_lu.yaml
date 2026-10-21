@@ -1,0 +1,8 @@
+id: rp_b_plus_lu
+notes: "Baseline B + quick lineup features + RAPM ratings, both projected (dev diagnostic: does RAPM add to the quick version?)."
+model:
+  type: logreg
+  C: 0.01
+  groups: [xg_share, goalie, rest, home, lineup, rapm]
+  window: std
+  goalie_variant: expected

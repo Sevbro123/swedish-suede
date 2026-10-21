@@ -65,3 +65,10 @@ goalies:
   # between seasons). The running rate is blended with this many pseudo-shots at last season's rate.
   league_relative: true
   league_prior_shots: 5000   # chosen on the feature's own league-wide bias (no game outcomes used)
+
+# Player RAPM on 5v5 xG (ratings/rapm.py), refit monthly; summed over the lineup in features/players.py.
+# lam (ridge penalty, in 5v5 minutes) and halflife_months (decay of older stints) were chosen on the
+# development seasons: see docs/player_ratings_choices.md.
+rapm:
+  lam: 300
+  halflife_months: 24

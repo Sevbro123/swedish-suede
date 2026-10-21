@@ -22,7 +22,9 @@ import pandas as pd
 from ..config import load_config, repo_path
 from .asof import build_features
 from .goalies import goalie_features, goalie_games_with_xg
-from .players import lineup_features, player_games, player_states
+from ..ratings.rapm import player_ratings
+from ..ratings.stints import main as stints_main
+from .players import lineup_features_from, lineup_members, player_games, player_states, rapm_lineup_features
 from .team_games import build_team_games
 
 OUTCOME_COLS = {"home_score", "away_score", "home_win", "decided_in", "last_period_type", "game_state"}
@@ -35,7 +37,24 @@ def _read_seasons(kind: str, seasons) -> pd.DataFrame:
 
 
 def _lineups(games: pd.DataFrame, events: pd.DataFrame, xg: pd.DataFrame, seasons, cfg: dict) -> pd.DataFrame:
-    """Player on-ice metrics (seasons with xG and shift charts) -> lineup features per team-game."""
+    """Player on-ice metrics (seasons with xG and shift charts) -> lineup features per team-game, plus the
+    lineup's RAPM ratings if the config has a ``rapm`` section."""
+    sides, members = lineup_inputs(games, events, xg, seasons, cfg)
+    out = lineup_features_from(sides, members)
+    if "rapm" in cfg:
+        ratings = player_ratings(load_stints(seasons), games, cfg["rapm"])
+        out = out.merge(rapm_lineup_features(sides, members, ratings), on=["game_id", "team_id"], validate="one_to_one")
+    return out
+
+
+def load_stints(seasons) -> pd.DataFrame:
+    """5v5 stints (ratings/stints.py); seasons with none on disk, and the season in progress, are built first."""
+    stints_main(["--seasons", *map(str, seasons)])
+    return _read_seasons("stints", seasons)
+
+
+def lineup_inputs(games: pd.DataFrame, events: pd.DataFrame, xg: pd.DataFrame, seasons, cfg: dict):
+    """(sides, members) of ``players.lineup_members`` from the seasons with xG and shift charts."""
     pgs = []
     for s in seasons:
         sh, xs = _read_seasons("shifts", [s]), xg[xg["game_id"].isin(set(games.loc[games["season"] == s, "game_id"]))]
@@ -52,7 +71,7 @@ def _lineups(games: pd.DataFrame, events: pd.DataFrame, xg: pd.DataFrame, season
         c = pd.read_parquet(confirmed)
         c = c[~c["game_id"].isin(set(rosters["game_id"])) & c["game_id"].isin(set(games["game_id"]))]
         rosters = pd.concat([rosters, c[rosters.columns]], ignore_index=True)
-    return lineup_features(rosters, games, states, cfg["players"], cfg.get("lineage", {}))
+    return lineup_members(rosters, games, states, cfg["players"], cfg.get("lineage", {}))
 
 
 def _schedule(proc) -> tuple[pd.DataFrame, pd.DataFrame]:

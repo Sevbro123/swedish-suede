@@ -29,9 +29,12 @@ EXCLUDE_PREFIXES = ("leaky_", "projected_")
 ADJUSTED_TAGS = ("_sa_", "_sva_")
 # Lineup features (features/players.py), likewise added after Phase 3: ``features: full_lineup``.
 LINEUP_TAG = "lineup_"
+# Lineup RAPM ratings (ratings/rapm.py): ``features: full_rapm`` = the full_lineup matrix plus rapm_*.
+RAPM_TAG = "rapm_"
 
 
-def full_feature_names(frame: pd.DataFrame, adjusted: bool = False, lineup: bool = False) -> list[str]:
+def full_feature_names(frame: pd.DataFrame, adjusted: bool = False, lineup: bool = False,
+                       rapm: bool = False) -> list[str]:
     """Per-side features that have both a home_ and an away_ column and are known pre-game."""
     names = []
     for c in frame.columns:
@@ -45,6 +48,8 @@ def full_feature_names(frame: pd.DataFrame, adjusted: bool = False, lineup: bool
         if not adjusted and any(t in base for t in ADJUSTED_TAGS):
             continue
         if not lineup and base.startswith(LINEUP_TAG):
+            continue
+        if not rapm and base.startswith(RAPM_TAG):
             continue
         names.append(base)
     return sorted(names)
@@ -108,7 +113,8 @@ CALIBRATORS = {"platt": _Platt, "isotonic": _Isotonic}
 def actual_lineup(frame: pd.DataFrame) -> pd.DataFrame:
     """Lineup columns filled from the actual (``leaky_``) lineup: the posted lineup at puck drop."""
     f = frame.copy()
-    for c in [c for c in f.columns if c.startswith(("home_leaky_lineup_", "away_leaky_lineup_"))]:
+    for c in [c for c in f.columns if c.startswith(("home_leaky_lineup_", "away_leaky_lineup_",
+                                                    "home_leaky_rapm_", "away_leaky_rapm_"))]:
         f[c.replace("leaky_", "", 1)] = f[c]
     return f
 
@@ -118,7 +124,8 @@ def _inputs(cfg: dict[str, Any], train: pd.DataFrame, test: pd.DataFrame) -> tup
     if cfg.get("lineup") == "actual":
         train, test = actual_lineup(train), actual_lineup(test)
     feats = cfg.get("features", "full")
-    names = full_feature_names(train, adjusted=feats == "full_adjusted", lineup=feats == "full_lineup")
+    names = full_feature_names(train, adjusted=feats == "full_adjusted", lineup=feats in ("full_lineup", "full_rapm"),
+                               rapm=feats == "full_rapm")
     return train.sort_values("start_time_utc"), test, names
 
 
