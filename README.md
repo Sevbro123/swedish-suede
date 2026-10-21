@@ -44,7 +44,10 @@ Things that can still change (the schedule, games final for under a day, the goa
 lineups) are stored as dated snapshots; per-game data becomes permanent once a game has been final for
 24 h, so NHL stat corrections are picked up. Shift charts the NHL hasn't posted yet (48 early 2026-27
 games so far) are retried on every update. Predictions use the full model with the projected lineup, or,
-once both teams have posted a lineup, the same model trained with actual lineups.
+once both teams have posted a lineup, the same model trained with actual lineups. Each prediction is
+also split into per-stat terms (`explain_upcoming.parquet`; the model is a standardized logistic
+regression, so the split is exact), and each upcoming-game card on the site opens a page showing what
+pushes it toward either team.
 
 ## Outstanding items
 

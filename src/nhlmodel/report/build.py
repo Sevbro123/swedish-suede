@@ -156,6 +156,94 @@ def _record(df: pd.DataFrame) -> dict | None:
             "log_loss": round(_ll(y, p), 4), "home_rate": round(float(y.mean()), 4)}
 
 
+# Model inputs -> plain language for the per-game explainer. Per-side stats are "<window>_<stat>".
+_WINDOWS = {"l5": "last 5 games", "l10": "last 10 games", "l20": "last 20 games", "ewm5": "last ~5 games, weighted",
+            "ewm15": "last ~15 games, weighted", "std": "this season"}
+_SHARES = {"xg": "xG share", "xg_5v5": "5-on-5 xG share", "corsi": "shot attempt share",
+           "corsi_5v5": "5-on-5 shot attempt share", "fenwick": "unblocked attempt share",
+           "fenwick_5v5": "5-on-5 unblocked attempt share", "sog": "shots on goal share", "goals": "goal share",
+           "goals_5v5": "5-on-5 goal share", "raw_corsi_5v5": "5-on-5 shot attempt share, unshrunk"}
+_RATES = {"goals_for_pg": "goals per game", "goals_against_pg": "goals allowed per game",
+          "sog_for_pg": "shots per game", "sog_against_pg": "shots allowed per game",
+          "pp_goals_for_pg": "power-play goals per game", "pp_goals_against_pg": "power-play goals allowed per game",
+          "sh_goals_for_pg": "shorthanded goals per game", "sh_goals_against_pg": "shorthanded goals allowed per game",
+          "penalties_for_pg": "penalties taken per game", "penalties_against_pg": "penalties drawn per game",
+          "pp_goals_for_per60": "power-play goals per 60 PP minutes",
+          "pp_goals_against_per60": "goals allowed per 60 PK minutes"}
+_SINGLE = {  # name -> (group, label, format)
+    "expected_goalie_gsax100_ewm": ("Goaltending", "starting goalie: saves above expected per 100 shots, recent", "signed2"),
+    "expected_goalie_gsax100_season": ("Goaltending", "starting goalie: saves above expected per 100 shots, season", "signed2"),
+    "expected_goalie_gsax100_career": ("Goaltending", "starting goalie: saves above expected per 100 shots, career", "signed2"),
+    "expected_goalie_shots_career": ("Goaltending", "starting goalie: career shots faced", "int"),
+    "lineup_on_xg_share": ("Players in the lineup", "dressed skaters' on-ice xG share", "pct"),
+    "lineup_rel_xg_share": ("Players in the lineup", "dressed skaters' xG share vs teammates", "pp"),
+    "lineup_missing_toi_share": ("Players in the lineup", "regulars missing (share of ice time)", "pct"),
+    "rest_days": ("Rest and schedule", "days of rest", "int"),
+    "back_to_back": ("Rest and schedule", "played yesterday", "yesno"),
+    "season_opener": ("Rest and schedule", "season opener", "yesno"),
+    "games_last_7d": ("Rest and schedule", "games in the last 7 days", "int"),
+    "tz_change_h": ("Rest and schedule", "time zones moved since last game", "signed1"),
+    "games_played_season": ("Rest and schedule", "games played this season", "int"),
+}
+_CONTEXT = {"neutral_site": ("Rest and schedule", "neutral site", "yesno")}
+
+
+def term_label(term: str) -> tuple[str, str, str]:
+    """(group, label, value format) for a design column of the full model."""
+    if term in _CONTEXT:
+        return _CONTEXT[term]
+    name = term.removeprefix("d_")
+    if name in _SINGLE:
+        return _SINGLE[name]
+    win, _, stat = name.partition("_")
+    when = _WINDOWS.get(win, win)
+    if stat.endswith("_share") and stat[:-6] in _SHARES:
+        base = stat[:-6]
+        group = ("Shot quality (xG)" if "xg" in base else "Goals" if "goals" in base else "Shot volume")
+        return group, f"{_SHARES[base]}, {when}", "pct"
+    if stat in _RATES:
+        group = ("Special teams" if stat.startswith(("pp_", "sh_", "penalties")) else
+                 "Goals" if stat.startswith("goals") else "Shot volume")
+        return group, f"{_RATES[stat]}, {when}", "num1" if stat.endswith("per60") else "num2"
+    return "Other stats", name.replace("_", " "), "num2"
+
+
+# Season stage (each team's games played) goes into the starting point rather than the drivers.
+_BASE_TERMS = ("intercept", "home_games_played_season", "away_games_played_season")
+
+
+def explain(terms: pd.DataFrame, p_home: float, top: int = 8) -> dict | None:
+    """Why one game's prediction is what it is (terms from ``models.families.explain_family``).
+
+    ``base``: the home win chance if the two teams were even on every input (home ice and season stage
+    only). Each group's and each of the ``top`` biggest single inputs' ``pts``: the home team's win chance
+    minus what it would be with no home-minus-away difference in that input (or group), in percentage
+    points; positive favors the home team."""
+    import numpy as np
+
+    def sig(z: float) -> float:
+        return float(1 / (1 + np.exp(-z)))
+
+    def num(v) -> float | None:
+        return None if pd.isna(v) else round(float(v), 4)
+
+    total = float(terms["logit"].sum())
+    if abs(sig(total) - p_home) > 1e-4:  # terms from a different fit than the prediction
+        return None
+    t = terms[~terms["term"].isin(_BASE_TERMS)].copy()
+    lab = t["term"].map(term_label)
+    t["group"], t["label"], t["fmt"] = lab.str[0], lab.str[1], lab.str[2]
+    groups = t.groupby("group")["logit"].sum()
+    n_inputs = int(len(t))
+    out_groups = [{"name": g, "pts": round(100 * (p_home - sig(total - v)), 2)} for g, v in groups.items()]
+    t = t.reindex(t["logit"].abs().sort_values(ascending=False).index).head(top)
+    return {"base": round(sig(float(terms.loc[terms["term"].isin(_BASE_TERMS), "logit"].sum())), 4),
+            "groups": sorted(out_groups, key=lambda g: -abs(g["pts"])),
+            "top": [{"label": r.label, "group": r.group, "fmt": r.fmt, "home": num(r.home), "away": num(r.away),
+                     "pts": round(100 * (p_home - sig(total - r.logit)), 2)} for r in t.itertuples()],
+            "n_inputs": n_inputs}
+
+
 def live(cfg) -> dict | None:
     """Upcoming-game predictions and this season's record (files written by ``python -m nhlmodel.live``)."""
     proc = repo_path(cfg["processed_dir"])
@@ -167,11 +255,16 @@ def live(cfg) -> dict | None:
     games = pd.read_parquet(proc / "games.parquet")
     feats = pd.read_parquet(proc / "features.parquet", columns=[
         "game_id", "home_rest_days", "away_rest_days", "home_back_to_back", "away_back_to_back"])
+    ep = proc / "explain_upcoming.parquet"
+    terms = pd.read_parquet(ep) if ep.exists() else pd.DataFrame(columns=["game_id"])
+    by_game = dict(tuple(terms.groupby("game_id")))
     rows = []
     for r in up.merge(feats, on="game_id", how="left").itertuples():
+        why = explain(by_game[r.game_id], float(r.p_home)) if r.game_id in by_game else None
         rows.append({"game_id": int(r.game_id), "start_utc": r.start_time_utc.isoformat(), "date": str(r.local_date),
                      "away": r.away_abbrev, "home": r.home_abbrev, "p_home": round(float(r.p_home), 4),
-                     "lineup": r.lineup, "home_b2b": bool(r.home_back_to_back == 1), "away_b2b": bool(r.away_back_to_back == 1)})
+                     "lineup": r.lineup, "home_b2b": bool(r.home_back_to_back == 1), "away_b2b": bool(r.away_back_to_back == 1),
+                     "why": why})
     out = {"updated_at": str(up["made_at"].iloc[0]) if "made_at" in up and len(up) else None,
            "season": int(season) if season else None, "label": _season_label(int(season)) if season else None,
            "upcoming": rows, "season_record": None, "live_record": None, "recent": []}
