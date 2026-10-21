@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from nhlmodel.models import families
-from nhlmodel.models.families import CALIBRATORS, full_design, full_feature_names, make_family
+from nhlmodel.models.families import CALIBRATORS, explain_family, full_design, full_feature_names, make_family
 
 
 def frame(n=3000, seed=0):
@@ -81,3 +81,18 @@ def test_calibration_split_never_splits_simultaneous_games():
     f["start_time_utc"] = f["start_time_utc"].dt.floor("1D")  # four games per start time
     p = make_family({"type": "logreg", "calibration": "platt", "calib_games": 301})(f.iloc[:1600], f.iloc[1600:])
     assert p.shape == (400,)
+
+
+def test_explained_terms_add_up_to_the_same_prediction():
+    f = frame().assign(game_id=lambda d: range(len(d)))
+    tr, te = f.iloc[:2500], f.iloc[2500:]
+    cfg = {"type": "logreg", "params": {"C": 0.01}, "calibration": "none"}
+    p, terms = explain_family(cfg)(tr, te)
+    assert np.allclose(p, make_family(cfg)(tr, te))
+    logit = terms.groupby("game_id")["logit"].sum().reindex(te["game_id"]).to_numpy()
+    assert np.allclose(1 / (1 + np.exp(-logit)), p)
+    xg = terms[terms["term"] == "d_xg_share"]
+    assert np.allclose(xg["home"] - xg["away"], (te["home_xg_share"] - te["away_xg_share"]).to_numpy())
+    assert (xg["logit"].to_numpy() > 0).sum() == (te["home_xg_share"] > te["away_xg_share"]).sum()  # better side, positive pull
+    with pytest.raises(ValueError):
+        explain_family({"type": "logreg", "calibration": "platt"})

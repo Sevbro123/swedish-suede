@@ -45,7 +45,9 @@ lineups) are stored as dated snapshots; per-game data becomes permanent once a g
 24 h, so NHL stat corrections are picked up. Shift charts the NHL hasn't posted yet (48 early 2026-27
 games so far) are retried on every update. Predictions use the full model with the projected lineup and its
 adjusted player ratings (`rp_logreg_full_C0.001`), or, once both teams have posted a lineup, the same model
-trained with actual lineups.
+trained with actual lineups. Each prediction is also split into per-stat terms (`explain_upcoming.parquet`;
+the model is a standardized logistic regression, so the split is exact), and each upcoming-game card on the
+site opens a page showing what pushes it toward either team.
 
 ## Outstanding items
 
