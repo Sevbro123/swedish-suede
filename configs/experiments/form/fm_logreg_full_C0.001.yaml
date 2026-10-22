@@ -1,0 +1,9 @@
+id: fm_logreg_full_C0.001
+notes: "Live model (full matrix + lineup + RAPM, C=0.001) + the dev-best form columns: skaters l20, starter l3, team l10."
+model:
+  type: logreg
+  params:
+    C: 0.001
+  features: full_rapm_form
+  form_columns: [form_pts_l20, form_goals_l20, form_ixg_l20, form_goalie_l3, form_win_l10, form_streak]
+  calibration: none

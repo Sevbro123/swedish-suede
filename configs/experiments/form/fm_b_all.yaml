@@ -1,0 +1,8 @@
+id: fm_b_all
+notes: "B + RAPM + the dev-best window of each form group: skaters l20, starter l3, team l10 (dev)."
+model:
+  type: logreg
+  C: 0.01
+  groups: [xg_share, goalie, rest, home, rapm, form_skater_l20, form_goalie_l3, form_team_l10]
+  window: std
+  goalie_variant: expected

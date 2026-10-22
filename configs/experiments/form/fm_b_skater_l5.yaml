@@ -1,0 +1,8 @@
+id: fm_b_skater_l5
+notes: "B + RAPM + lineup skaters' form over their last 5 games (dev)."
+model:
+  type: logreg
+  C: 0.01
+  groups: [xg_share, goalie, rest, home, rapm, form_skater_l5]
+  window: std
+  goalie_variant: expected
