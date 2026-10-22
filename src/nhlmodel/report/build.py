@@ -29,12 +29,6 @@ def _season_label(s: int) -> str:
     return f"{s // 10000}-{str(s % 10000)[2:]}"
 
 
-def _train_label(span: str) -> str:
-    """'20222023-20232024' -> '2022-23 -> 2023-24'; a single season -> '2022-23'."""
-    a, b = (_season_label(int(x)) for x in span.split("-"))
-    return a if a == b else f"{a} -> {b}"
-
-
 def data_status(cfg) -> dict:
     proc, raw = repo_path(cfg["processed_dir"]), repo_path(cfg["raw_dir"])
     games = pd.read_parquet(proc / "games.parquet")
@@ -63,23 +57,6 @@ def data_status(cfg) -> dict:
             })
         rows.append(row)
     return {"seasons": rows, "total_games": int(len(games))}
-
-
-def xg_eval() -> dict | None:
-    p = repo_path("results/xg_eval.csv")
-    if not p.exists():
-        return None
-    df = pd.read_csv(p)
-    return {
-        "split": "held-out season S; model trained only on seasons before S",
-        "rows": [
-            {"season": int(r.season), "label": _season_label(int(r.season)), "train": _train_label(r.train_seasons),
-             "n_test": int(r.n_test), "xg": round(r.logloss_xg, 4), "distance": round(r.logloss_distance_baseline, 4),
-             "constant": round(r.logloss_constant, 4), "xg_over_goals": round(r.sum_xg_over_goals, 3)}
-            for r in df.itertuples()
-        ],
-        "modified": datetime.fromtimestamp(p.stat().st_mtime, timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-    }
 
 
 # Plain-language names for the runs a visitor should see first. kind: "main" (shown by default),
@@ -322,7 +299,6 @@ def build(cfg, out: Path) -> Path:
         "built_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "git_rev": git_rev(),
         "data": data_status(cfg),
-        "xg": xg_eval(),
         "experiments": experiments(),
         "live": live(cfg),
         "predictions": explorer(cfg),

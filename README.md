@@ -88,11 +88,10 @@ Done since the last list: 5v5 player ratings (PR #2) and the lineup watcher that
 3. **EDGE features** (prior-season aggregates only; in-season EDGE can't be built without leakage).
 4. **Betting-odds comparison (Phase 5).** Needs a historical odds source with usable terms. The loader and
    vig math are ready (`src/nhlmodel/odds/`).
-5. **What-if calculator** on the site is still locked (needs the model's coefficients exported).
-6. **Actions minutes.** The watcher keeps a runner up from about 90 minutes before the first puck drop to the
+5. **Actions minutes.** The watcher keeps a runner up from about 90 minutes before the first puck drop to the
    last one (about 4-6 hours on a full night), plus about 3 minutes per idle trigger. Free for a public repo;
    on a private one it would exceed the free tier.
-7. **Watch the extreme predictions.** Historically, games given under 25% were won 28% of the time
+6. **Watch the extreme predictions.** Historically, games given under 25% were won 28% of the time
    (36 games): slightly overconfident. Check again as the live log grows.
 
 Things to keep an eye on:

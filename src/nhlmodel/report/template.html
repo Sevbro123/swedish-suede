@@ -32,7 +32,7 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
   body { background: var(--bg); color: var(--ink); font: 16px/1.5 "Space Grotesk", system-ui, sans-serif; overflow: hidden; }
-  .mono, pre, button.mi, .chip, .hud, .bar-fill { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-ligatures: none; }
+  .mono, pre, button.mi, .chip, .hud { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-ligatures: none; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
   [hidden] { display: none !important; }
@@ -125,24 +125,6 @@
   table.data th[aria-sort="ascending"] button::after { content: " ^"; color: var(--accent); }
   table.data th[aria-sort="descending"] button::after { content: " v"; color: var(--accent); }
   table.data tbody tr:hover { background: var(--glow); }
-  td .mini { font: 12px "JetBrains Mono", monospace; color: var(--accent); letter-spacing: 1px; margin-right: 8px; }
-  td.pending { color: var(--muted); } .flag { color: var(--accent-2); font-weight: 600; }
-
-  /* ascii bars */
-  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 6px; font-size: 14px; color: var(--ink-2); }
-  .legend .sw { display: inline-grid; place-items: center; width: 22px; height: 16px; border-radius: 4px; margin-right: 6px; vertical-align: -3px;
-    background: var(--c); color: var(--bg); font: 600 11px "JetBrains Mono", monospace; }
-  .season-group { padding: 10px 0; border-top: 1px dashed var(--line); } .season-group:first-of-type { border-top: 0; }
-  .season-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; margin: 0 6px 6px; }
-  .season-head span { font-size: 13px; color: var(--muted); }
-  .bar-row { display: grid; grid-template-columns: 128px 1fr 64px; align-items: center; gap: 10px; padding: 4px 6px; border-radius: 8px; }
-  .bar-row:hover, .bar-row:focus-visible { background: var(--glow); }
-  .bar-row .lab { font-size: 14px; color: var(--ink-2); } .bar-row .val { font: 14px "JetBrains Mono", monospace; text-align: right; }
-  @media (max-width: 520px) { .bar-row { grid-template-columns: 1fr 58px; } .bar-row .lab { grid-column: 1 / -1; } }
-  .bar-track { position: relative; height: 22px; border-radius: 6px; background: color-mix(in srgb, var(--ink) 6%, transparent); overflow: hidden; }
-  .bar-fill { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 0 6px 6px 0; overflow: hidden; white-space: nowrap; font-size: 13px;
-    line-height: 22px; letter-spacing: 1px; color: var(--bg); background: var(--c); transition: width 900ms cubic-bezier(.2,.8,.2,1); }
-  .bar-fill::before { content: attr(data-tex); opacity: .5; padding-left: 3px; }
 
   /* experiments: ascii forest plot */
   .forest { font: 13px/1.6 "JetBrains Mono", monospace; font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; overflow-x: auto; }
@@ -237,7 +219,6 @@
   #tip.on { opacity: 1; }
 
   body.calm #start { animation: none; }
-  body.calm .bar-fill { transition: none; }
 </style>
 </head>
 <body data-view="title">
@@ -491,12 +472,8 @@
       unlocked: !!(D.live && D.live.upcoming.length), need: "predictions for upcoming games (run python -m nhlmodel.live)." },
     { id: "experiments", label: "MODEL SCOREBOARD", desc: "every model we tried, graded on games it never saw", unlocked: !!D.experiments,
       need: "graded model results." },
-    { id: "xg", label: "SHOT QUALITY", desc: "how likely each shot was to go in", unlocked: !!D.xg },
-    { id: "data", label: "THE DATA", desc: "16 seasons of games, and how we checked them", unlocked: true },
     { id: "games", label: "GAME EXPLORER", desc: "every graded game: our chance vs what happened", unlocked: !!D.predictions,
       need: "saved game-by-game predictions." },
-    { id: "calc", label: "WHAT-IF CALCULATOR", desc: "change the inputs, watch the odds move", unlocked: !!D.model,
-      need: "a finished model exported for the calculator." },
     { id: "settings", label: "SETTINGS", desc: "team colors, light or dark, effects", unlocked: true, meta: true },
   ];
   $("rev").textContent = D.git_rev;
@@ -636,61 +613,6 @@
         `<div style="margin:6px 0 12px"><div class="prog-head"><span>${k}</span><span class="mono">${fmt(c)} / ${fmt(total)}</span></div>
          <div class="prog" tabindex="0" data-tip="${esc(`${k}: ${fmt(c)} of ${fmt(total)} games (${pct(c / total)})`)}">${asciiBar(c / total, n)}</div></div>`).join("") +
         `<div class="prog">goalie stats: <span class="fl">complete</span>, all ${S.length} seasons</div>`;
-    },
-
-    data(body) {
-      const dl = (s) => Math.min(s.pbp_downloaded, s.shifts_downloaded) / s.games;
-      const COLS = [
-        ["Season", (s) => s.season, (s) => esc(s.label)],
-        ["Games", (s) => s.games, (s) => fmt(s.games)],
-        ["Downloaded", dl, (s) => { const k = Math.round(dl(s) * 10); return `<span class="mini">${"#".repeat(k)}${".".repeat(10 - k)}</span>${pct(dl(s), 0)}`; }],
-        ["Goals add up", (s) => s.goals_match, (s) => (s.processed ? pct(s.goals_match) : null)],
-        ["Both goalies known", (s) => s.two_starters, (s) => (s.processed ? pct(s.two_starters) : null)],
-        ["Bad shift charts", (s) => s.shifts_flagged, (s) => (s.processed ? (s.shifts_flagged ? `<span class="flag">${s.shifts_flagged}</span>` : "0") : null)],
-        ["Shots per game", (s) => s.shots_xy_per_game, (s) => (s.processed ? s.shots_xy_per_game.toFixed(1) : null)],
-        ["Home team won", (s) => s.home_win_rate, (s) => pct(s.home_win_rate)],
-      ];
-      let sortCol = 0, sortDir = -1;
-      body.innerHTML = `<p class="sub">Everything comes from the NHL's public game data: a log of every shot, goal and penalty, plus shift charts showing who was on the ice. ` +
-        `Before any model sees a season, it's checked for gaps. One row per season; click a column to sort.</p>` +
-        `<div class="card" style="margin-bottom:14px"><dl class="gloss">` +
-        `<dt>Goals add up</dt><dd>Games where the goals in the shot log match the final score.</dd>` +
-        `<dt>Both goalies known</dt><dd>Games where the starting goalie of each team is recorded.</dd>` +
-        `<dt>Bad shift charts</dt><dd>Games whose shift chart doesn't add up to a full game. Their player stats are skipped.</dd>` +
-        `<dt>Shots per game</dt><dd>Unblocked shots per game with a recorded location (what the shot-quality model needs).</dd>` +
-        `<dt>Home team won</dt><dd>How often the home team won, overtime and shootouts included.</dd></dl></div>` +
-        `<div class="card tbl-wrap"><table class="data" id="dq"></table></div>`;
-      const draw = () => {
-        const key = COLS[sortCol][1];
-        const rows = S.slice().sort((a, b) => { const x = key(a), y = key(b);
-          if (x == null || y == null) return (x == null) - (y == null); return (x - y) * sortDir; });
-        $("dq").innerHTML = `<caption class="sr">Data quality by season</caption><thead><tr>${COLS.map(([h], i) =>
-          `<th scope="col" aria-sort="${i === sortCol ? (sortDir > 0 ? "ascending" : "descending") : "none"}"><button type="button" data-sort="${i}">${esc(h)}</button></th>`).join("")}</tr></thead>` +
-          `<tbody>${rows.map((s) => `<tr>${COLS.map(([, , f]) => { const v = f(s); return v == null ? `<td class="pending">pending</td>` : `<td>${v}</td>`; }).join("")}</tr>`).join("")}</tbody>`;
-      };
-      $("dq").addEventListener("click", (e) => { const b = e.target.closest("[data-sort]"); if (!b) return;
-        const i = +b.dataset.sort; sortDir = i === sortCol ? -sortDir : -1; sortCol = i; draw(); });
-      draw();
-    },
-
-    xg(body) {
-      const SERIES = [["Our shot model", "xg", "--s1", "#"], ["Distance and angle only", "distance", "--s2", "="], ["Same chance for every shot", "constant", "--s3", ":"]];
-      const R = D.xg.rows, max = Math.max(...R.flatMap((r) => SERIES.map(([, k]) => r[k])));
-      body.innerHTML = `<p class="sub">Expected goals (xG) is the chance that a shot goes in, judged from where and how it was taken: distance, angle, shot type, rebounds and more. ` +
-        `A 0.10 xG shot goes in about 1 time in 10. Adding up a team's xG shows how many goals its chances were worth, which usually predicts future results better than actual goals do.</p>` +
-        `<p class="sub">Each season below was predicted by a model built only on earlier seasons. Bars show prediction error per shot: <b>shorter is better</b>.</p>` +
-        `<div class="card"><div class="legend">${SERIES.map(([n, , c, g]) => `<span><span class="sw" style="--c:var(${c})">${g}</span>${esc(n)}</span>`).join("")}</div>` +
-        R.slice().reverse().map((r) => `<div class="season-group"><div class="season-head"><b>${esc(r.label)} season</b><span>built on ${esc(r.train)}</span>` +
-          `<span>${fmt(r.n_test)} shots</span><span class="chip" tabindex="0" data-tip="Goals the model expected in ${esc(r.label)}, divided by goals actually scored. 1.000 means it got the total exactly right.">expected / actual goals ${r.xg_over_goals.toFixed(3)}</span></div>` +
-          SERIES.map(([n, k, c, g]) => `<div class="bar-row" tabindex="0" data-tip="${esc(`${n}\n${r.label}: prediction error ${r[k].toFixed(4)}\n${fmt(r.n_test)} shots`)}">` +
-            `<span class="lab">${esc(n)}</span><span class="bar-track"><span class="bar-fill" style="--c:var(${c})" data-w="${(100 * r[k] / max).toFixed(2)}" data-tex="${g.repeat(140)}"></span></span>` +
-            `<span class="val">${r[k].toFixed(4)}</span></div>`).join("") + "</div>").join("") +
-        `<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--ink-2)">Table view</summary><div class="tbl-wrap"><table class="data" style="margin-top:8px">` +
-        `<thead><tr><th>Season</th><th>Built on</th><th>Shots</th><th>Our shot model</th><th>Distance and angle</th><th>Same chance</th><th>Expected / actual goals</th></tr></thead><tbody>${
-          R.map((r) => `<tr><td>${esc(r.label)}</td><td>${esc(r.train)}</td><td>${fmt(r.n_test)}</td><td>${r.xg.toFixed(4)}</td><td>${r.distance.toFixed(4)}</td><td>${r.constant.toFixed(4)}</td><td>${r.xg_over_goals.toFixed(3)}</td></tr>`).join("")}</tbody></table></div></details>` +
-        `<div style="margin-top:8px;font-size:12px;color:var(--muted)">source: results/xg_eval.csv, modified ${esc(D.xg.modified)}</div></div>`;
-      const bars = body.querySelectorAll(".bar-fill");
-      setTimeout(() => bars.forEach((b, i) => setTimeout(() => { b.style.width = b.dataset.w + "%"; }, calm ? 0 : i * 55)), calm ? 0 : 380);
     },
 
     experiments(body) {
