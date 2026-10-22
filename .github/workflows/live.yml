@@ -45,10 +45,10 @@ jobs:
           mkdir -p data/processed
           git archive FETCH_HEAD processed | tar -x --strip-components=1 -C data/processed
 
-      - name: Predictions and odds logs from the last published site
+      - name: Predictions, odds and parlay logs from the last published site
         run: |
           if git fetch --depth=1 origin site 2>/dev/null; then
-            for f in predictions_log.csv odds_log.csv; do
+            for f in predictions_log.csv odds_log.csv paper_parlays.csv; do
               git show FETCH_HEAD:$f > data/processed/$f || rm -f data/processed/$f
             done
           fi

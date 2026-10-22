@@ -163,6 +163,8 @@
   dl.gloss dt { color: var(--ink); font-weight: 500; } dl.gloss dd { margin: 0; }
   @media (max-width: 560px) { dl.gloss { grid-template-columns: 1fr; } dl.gloss dd { margin-bottom: 6px; } }
   .note { margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 12px; color: var(--ink-2); }
+  .legend .sw { color: var(--c); font-family: "JetBrains Mono", monospace; margin-right: 6px; }
   /* upcoming games */
   .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
   .game { background: var(--card-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
@@ -810,38 +812,56 @@ ${say(x.pts)}`)}"><span class="lab">${esc(x.name)}</span>${bar(x.pts, maxG)}<spa
       const pts = (v) => { if (v == null) return "-"; const r = Math.round(1000 * v) / 10; return (r > 0 ? "+" : "") + (r || 0).toFixed(1) + " pts"; };
       const tiles = [
         ["Bankroll", S2.bankroll.toFixed(2) + "u", `started at ${S2.bankroll_start}u on ${P.since}`],
-        ["Record", `${S2.won}-${S2.lost}`, `${S2.settled} settled, ${S2.open} waiting on a result`],
+        ["Flat 1-unit benchmark", S2.flat.bankroll.toFixed(2) + "u", `same bets, ${R.flat_stake}u each: ${S2.flat.roi == null ? "-" : pct(S2.flat.roi)} return`],
+        ["Record", `${S2.won}-${S2.lost}`, `${S2.settled} settled, ${S2.open} waiting; parlays ${S2.parlays_won}-${S2.parlays_settled - S2.parlays_won}`],
         ["Return on stakes", S2.roi == null ? "-" : pct(S2.roi), `${signed(S2.profit)}u on ${S2.staked}u staked`],
         ["Beat the closing price", S2.beat_close == null ? "-" : pct(S2.beat_close, 0), `average move ${pts(S2.avg_clv)} our way`],
       ];
-      const c = S2.curve, W = 600, H = 120;
+      const c = S2.curve, cf = S2.curve_flat, W = 600, H = 120;
       let chart = `<div class="note">The bankroll chart starts once the first bet is settled.</div>`;
       if (c.length) {
-        const ys = [S2.bankroll_start, ...c], lo = Math.min(...ys), hi = Math.max(...ys), span = Math.max(hi - lo, 1);
+        const ys = [S2.bankroll_start, ...c], yf = [S2.bankroll_start, ...cf], all = ys.concat(yf);
+        const lo = Math.min(...all), hi = Math.max(...all), span = Math.max(hi - lo, 1);
         const y = (v) => (H - 8 - ((v - lo) / span) * (H - 16)).toFixed(1), x = (i) => ((i / Math.max(ys.length - 1, 1)) * W).toFixed(1);
         chart = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:${H}px;display:block" role="img" aria-label="Bankroll after each settled bet">` +
           `<line x1="0" x2="${W}" y1="${y(S2.bankroll_start)}" y2="${y(S2.bankroll_start)}" stroke="var(--line)" stroke-dasharray="4 4"/>` +
+          `<polyline fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="2 3" vector-effect="non-scaling-stroke" points="${yf.map((v, i) => `${x(i)},${y(v)}`).join(" ")}"/>` +
           `<polyline fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke" points="${ys.map((v, i) => `${x(i)},${y(v)}`).join(" ")}"/></svg>` +
+          `<div class="legend"><span><span class="sw" style="--c:var(--accent)">#</span>our staking (bigger bets on bigger edges, plus parlays)</span>` +
+          `<span><span class="sw" style="--c:var(--muted)">:</span>flat ${R.flat_stake}u on every bet</span></div>` +
           `<div class="note">Bankroll after each settled bet, in units. Dashed line: the starting ${S2.bankroll_start}u.</div>`;
       }
+      const tiers = R.stake_tiers.map(([e, u], i) => { const nx = R.stake_tiers[i + 1];
+        return `${u}u at ${(100 * e).toFixed(0)}${nx ? `-${(100 * nx[0]).toFixed(0)}` : "+"} points`; }).join(", ");
       const day = (iso) => new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
       const RES = { won: ["won", "right"], lost: ["lost", "wrong"], open: ["not started", ""], pending: ["waiting", ""] };
       body.innerHTML = `<p class="sub">Pretend bets, no real money. Before each game the model's win chance is compared with the betting price ` +
         `from the NHL's betting partner (${esc(P.books.join(", ") || "none yet")}), with the bookmaker's cut taken out. When our chance for a team is at least ` +
-        `${(100 * R.min_edge).toFixed(0)} points higher, we bet ${R.stake} unit on that team at that price. The bet is the last one made before puck drop, so it uses the confirmed lineup when it posts in time.</p>` +
+        `${(100 * R.min_edge).toFixed(0)} points higher, we bet on that team at that price; anything closer is a toss-up and we sit it out. ` +
+        `The bigger the gap, the bigger the bet: ${tiers}. When ${(100 * R.parlay.min_edge).toFixed(0)}+ point picks line up on the same day, ` +
+        `the strongest ${R.parlay.max_legs > 2 ? `two or three` : "two"} also go into a ${R.parlay.stake}u parlay. Each bet is the last one made before puck drop, so it uses the confirmed lineup when it posts in time; ` +
+        `a parlay is locked when its first game starts.</p>` +
         `<div class="tiles">${tiles.map(([k, v, s]) => `<div class="tile"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="s">${esc(s)}</div></div>`).join("")}</div>` +
         `<div class="card" style="margin-bottom:14px">${chart}</div>` +
         `<div class="card" style="margin-bottom:14px"><dl class="gloss">` +
         `<dt>Edge</dt><dd>Our win chance minus the book's, after removing the bookmaker's cut. ${S2.bets} bets out of ${S2.games_priced} priced games so far, average edge ${pts(S2.avg_edge)}.</dd>` +
         `<dt>Closing price</dt><dd>The last price before puck drop. If the market moved toward our side after we bet, we beat the close. Over a few hundred bets this says more than the win-loss record, which is mostly luck early on.</dd>` +
-        `<dt>Unit</dt><dd>A fixed bet size. Profit is shown in units, so it reads the same whatever one unit is worth.</dd></dl></div>` +
+        `<dt>Unit</dt><dd>A fixed bet size. Profit is shown in units, so it reads the same whatever one unit is worth.</dd>` +
+        `<dt>Parlay</dt><dd>One bet on several games that pays only if every pick wins. The payout multiplies, but so does the bookmaker's cut, so it is kept small.</dd></dl></div>` +
         `<div class="card tbl-wrap"><table class="data"><thead><tr><th>Date</th><th style="text-align:left">Game</th><th>Bet</th><th>Price</th><th>Our chance</th>` +
-        `<th>Book's chance</th><th>Close</th><th>Moved</th><th>Result</th><th>Profit</th></tr></thead><tbody>${
+        `<th>Book's chance</th><th>Stake</th><th>Close</th><th>Moved</th><th>Result</th><th>Profit</th></tr></thead><tbody>${
           P.bets.map((b) => { const r = RES[b.status] || [b.status, ""];
             return `<tr><td>${esc(day(b.start_utc))}</td><td style="text-align:left">${esc(b.away)} @ ${esc(b.home)}</td><td>${esc(b.team)}</td>` +
-              `<td class="mono">${esc(ml(b.price))}</td><td>${pct(b.p)}</td><td>${pct(b.p_mkt)}</td><td class="mono">${b.close == null ? "-" : esc(ml(b.close))}</td>` +
+              `<td class="mono">${esc(ml(b.price))}</td><td>${pct(b.p)}</td><td>${pct(b.p_mkt)}</td><td class="mono">${b.stake}u</td><td class="mono">${b.close == null ? "-" : esc(ml(b.close))}</td>` +
               `<td>${b.clv == null ? "-" : esc(pts(b.clv))}</td><td class="${r[1]}">${esc(r[0])}</td><td class="mono">${b.profit == null ? "-" : esc(signed(b.profit))}</td></tr>`; }).join("")
         }</tbody></table>${P.bets.length ? "" : `<div class="note">No game has cleared the ${(100 * R.min_edge).toFixed(0)}-point bar yet.</div>`}</div>` +
+        `<div class="card tbl-wrap" style="margin-top:14px"><h3>Parlays</h3>${P.parlays.length ? `<table class="data"><thead><tr><th>Date</th><th style="text-align:left">Picks</th>` +
+          `<th>Pays</th><th>Our chance</th><th>Book's chance</th><th>Stake</th><th>Result</th><th>Profit</th></tr></thead><tbody>${
+          P.parlays.map((q) => { const r = RES[q.status] || [q.status, ""];
+            return `<tr><td>${esc(q.date)}</td><td style="text-align:left" class="mono">${esc(q.legs)}</td><td class="mono">${q.decimal.toFixed(2)}x</td>` +
+              `<td>${pct(q.p)}</td><td>${pct(q.p_mkt)}</td><td class="mono">${q.stake}u</td><td class="${r[1]}">${esc(r[0])}</td>` +
+              `<td class="mono">${q.profit == null ? "-" : esc(signed(q.profit))}</td></tr>`; }).join("")}</tbody></table>`
+          : `<div class="note">No day has had two ${(100 * R.parlay.min_edge).toFixed(0)}+ point picks yet.</div>`}</div>` +
         `<div class="note">For tracking the model only. Nothing here is betting advice.</div>`;
     },
 

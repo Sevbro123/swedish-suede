@@ -267,15 +267,20 @@ def live(cfg) -> dict | None:
 
 
 def paper(cfg) -> dict | None:
-    """Paper trading: headline numbers, bankroll curve and every bet (paper_bets.csv from ``nhlmodel.live``)."""
-    from ..paper import summary
+    """Paper trading: headline numbers, bankroll curves, every bet and parlay (written by ``nhlmodel.live``)."""
+    from ..paper import LEG_COLS, grade_parlays, summary
 
-    p = repo_path(cfg["processed_dir"]) / "paper_bets.csv"
+    proc = repo_path(cfg["processed_dir"])
+    p = proc / "paper_bets.csv"
     if not p.exists():
         return None
     bets = pd.read_csv(p)
     if bets.empty:
         return None
+    lp = proc / "paper_parlays.csv"
+    legs = pd.read_csv(lp) if lp.exists() else pd.DataFrame(columns=LEG_COLS)
+    games = pd.read_parquet(proc / "games.parquet", columns=["game_id", "home_win"])
+    parlays = grade_parlays(legs, games, pd.Timestamp.now(tz="UTC"))
     rules = load_config("configs/paper.yaml")
     placed = bets[bets["side"].fillna("") != ""].iloc[::-1]   # newest first
 
@@ -285,13 +290,17 @@ def paper(cfg) -> dict | None:
     rows = [{"start_utc": r.start_utc, "away": r.away, "home": r.home, "side": r.side,
              "team": r.home if r.side == "home" else r.away, "price": int(r.price), "book": r.book,
              "p": num(r.p_home if r.side == "home" else 1 - r.p_home),
-             "p_mkt": num(r.p_mkt_home if r.side == "home" else 1 - r.p_mkt_home),
+             "p_mkt": num(r.p_mkt_home if r.side == "home" else 1 - r.p_mkt_home), "edge": num(r.edge),
+             "stake": num(r.stake, 2),
              "close": None if pd.isna(r.close_home_ml) else int(r.close_home_ml if r.side == "home" else r.close_away_ml),
              "clv": num(r.clv), "lineup": r.lineup, "status": r.status, "profit": num(r.profit, 2)}
             for r in placed.itertuples()]
+    prows = [{"date": r.date, "legs": r.legs, "n_legs": r.n_legs, "decimal": r.decimal, "p": num(r.p), "p_mkt": num(r.p_mkt),
+              "stake": num(r.stake, 2), "status": r.status, "profit": num(r.profit, 2)} for r in parlays.iloc[::-1].itertuples()]
     first = str(bets["start_utc"].min())[:10]
-    return {"summary": summary(bets, rules), "rules": {k: rules[k] for k in ("bankroll", "stake", "min_edge")},
-            "since": first, "books": sorted(set(bets["book"].dropna())), "bets": rows}
+    return {"summary": summary(bets, parlays, rules),
+            "rules": {k: rules[k] for k in ("bankroll", "min_edge", "stake_tiers", "flat_stake", "parlay")},
+            "since": first, "books": sorted(set(bets["book"].dropna())), "bets": rows, "parlays": prows}
 
 
 def explorer(cfg) -> dict | None:

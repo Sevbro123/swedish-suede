@@ -9,7 +9,8 @@ backtest way (monthly refits, only earlier games) -> predictions log -> paper be
 The predictions log (data/processed/predictions_log.csv) keeps the last prediction made before each
 game's start, so the site can show the live record. It is also copied to site/ (the GitHub Action
 carries it between runs on the ``site`` branch). The odds log (the partner book's moneylines, read each
-run) travels the same way; the paper bets are rebuilt from the two logs every run (``nhlmodel.paper``).
+run) and the paper parlays (paper_parlays.csv) travel the same way; the single paper bets are rebuilt from
+the two logs every run (``nhlmodel.paper``).
 """
 from __future__ import annotations
 
@@ -70,16 +71,20 @@ def record_odds(cfg, client, now: pd.Timestamp) -> int:
     return len(new)
 
 
-def paper_trade(proc, log: pd.DataFrame, now: pd.Timestamp) -> pd.DataFrame:
-    """Rebuild the paper bets from the predictions and odds logs (``nhlmodel.paper``)."""
-    from .paper import BET_COLS, build_bets
+def paper_trade(proc, log: pd.DataFrame, now: pd.Timestamp) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Rebuild the paper bets from the predictions and odds logs and update the parlays (``nhlmodel.paper``).
+    Returns (bets, parlay legs)."""
+    from .paper import BET_COLS, LEG_COLS, build_bets, update_parlays
 
-    op = proc / "odds_log.csv"
+    lp, op = proc / "paper_parlays.csv", proc / "odds_log.csv"
+    legs = pd.read_csv(lp) if lp.exists() else pd.DataFrame(columns=LEG_COLS)
     if not op.exists():
-        return pd.DataFrame(columns=BET_COLS)
+        return pd.DataFrame(columns=BET_COLS), legs
     games = pd.concat([pd.read_parquet(proc / "games.parquet"), pd.read_parquet(proc / "upcoming.parquet")])
-    games = games.drop_duplicates("game_id")[["game_id", "start_time_utc", "away_abbrev", "home_abbrev", "home_win"]]
-    return build_bets(log, pd.read_csv(op), games, load_config("configs/paper.yaml"), now)
+    games = games.drop_duplicates("game_id")[["game_id", "start_time_utc", "local_date", "away_abbrev", "home_abbrev", "home_win"]]
+    cfg = load_config("configs/paper.yaml")
+    bets = build_bets(log, pd.read_csv(op), games, cfg, now)
+    return bets, update_parlays(legs, bets, cfg, now)
 
 
 def season_so_far(cfg_path: str, season: int) -> pd.DataFrame:
@@ -133,13 +138,15 @@ def main(argv: list[str] | None = None) -> int:
     if len(preds):
         log = update_log(log, preds, now)
     log.to_csv(log_path, index=False)
-    bets = paper_trade(proc, log, now)
+    bets, legs = paper_trade(proc, log, now)
     bets.to_csv(proc / "paper_bets.csv", index=False)
-    print(f"paper trading: {int((bets['side'].fillna('') != '').sum())} bets on {len(bets)} priced games")
+    legs.to_csv(proc / "paper_parlays.csv", index=False)
+    print(f"paper trading: {int((bets['side'].fillna('') != '').sum())} bets on {len(bets)} priced games, "
+          f"{legs['date'].nunique()} parlays")
 
     out = repo_path("site")
     path = build_site(cfg, out)
-    for name in ("predictions_log.csv", "odds_log.csv", "paper_bets.csv"):
+    for name in ("predictions_log.csv", "odds_log.csv", "paper_bets.csv", "paper_parlays.csv"):
         if (proc / name).exists():
             shutil.copy(proc / name, out / name)
     print(f"wrote {path}")
