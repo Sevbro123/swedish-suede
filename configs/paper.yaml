@@ -1,6 +1,20 @@
 # Paper trading: the bets the live model would make at the NHL partner book's moneylines (nhlmodel.paper).
 bankroll: 100        # starting bankroll, in units (nominal: only the profit curve is shown)
-stake: 1             # flat stake per bet, in units
-min_edge: 0.03       # bet a side when the model's win chance beats the book's no-vig chance by this much
+min_edge: 0.03       # bet a side only when the model's win chance beats the book's no-vig chance by this much;
+                     # anything closer is a toss-up and gets no bet
 devig: multiplicative
 max_price_age_min: 30   # a prediction is bet only at a price read within this many minutes before it
+
+# Stake by edge: [edge at or above, units]. The flat strategy (1 unit on every bet) is kept alongside as a benchmark.
+stake_tiers:
+  - [0.03, 1]
+  - [0.05, 2]
+  - [0.08, 3]
+flat_stake: 1
+
+# Parlay: when 2+ games on the same day clear parlay.min_edge, also bet the strongest (up to max_legs) together.
+# It can change until its first game starts, then it's locked.
+parlay:
+  min_edge: 0.05
+  max_legs: 3
+  stake: 0.5

@@ -103,10 +103,13 @@ Done since the last list: 5v5 player ratings (PR #2) and the lineup watcher that
 betting partner's current 2-way moneylines (`/v1/partner-game/US/now`, no key needed) into
 `data/processed/odds_log.csv`, which travels between runs on the `site` branch like the predictions log
 (so it is readable at the site's URL). `nhlmodel.paper` rebuilds the bets from the two logs every run: each
-game's last prediction before puck drop, at the price read in that same run, bets 1 unit on a side whose
-model chance beats the no-vig price by 3+ points; the last price before puck drop is the close (for CLV).
-Rules are in `configs/paper.yaml`; the site's Paper trading page shows bankroll, record, ROI, CLV and every
-bet.
+game's last prediction before puck drop, at the price read in that same run, bets a side whose model
+chance beats the no-vig price by 3+ points (closer is a toss-up: no bet). The stake grows with the edge
+(1u at 3-5 points, 2u at 5-8, 3u at 8+), and a flat 1u version of the same bets is kept as a benchmark.
+When 2+ games on a day clear 5 points, the strongest (up to 3) also go into a 0.5u parlay, kept in
+`paper_parlays.csv` (carried on the `site` branch) and locked once its first game starts. The last price
+before puck drop is the close (for CLV). Rules are in `configs/paper.yaml`; the site's Paper trading page
+shows both bankrolls, record, ROI, CLV, every bet and every parlay.
 
 Things to keep an eye on:
 
