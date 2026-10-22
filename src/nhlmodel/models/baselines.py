@@ -28,6 +28,17 @@ GROUPS = {
     "rapm": ["rapm_off", "rapm_def", "lineup_missing_toi_share"],
     "rapm_leaky": ["leaky_rapm_off", "leaky_rapm_def", "leaky_lineup_missing_toi_share"],
     "rest": ["rest_days", "back_to_back"],
+    # recent form (features/form.py): lineup skaters, expected starter, team results; window {n} games
+    "form_skater_l5": ["form_pts_l5", "form_goals_l5", "form_ixg_l5"],
+    "form_skater_l10": ["form_pts_l10", "form_goals_l10", "form_ixg_l10"],
+    "form_skater_l20": ["form_pts_l20", "form_goals_l20", "form_ixg_l20"],
+    "form_skater_leaky_l10": ["leaky_form_pts_l10", "leaky_form_goals_l10", "leaky_form_ixg_l10"],
+    "form_goalie_l3": ["form_goalie_l3"],
+    "form_goalie_l5": ["form_goalie_l5"],
+    "form_goalie_l10": ["form_goalie_l10"],
+    "form_goalie_leaky_l5": ["leaky_form_goalie_l5"],
+    "form_team_l5": ["form_win_l5", "form_streak"],
+    "form_team_l10": ["form_win_l10", "form_streak"],
 }
 GOALIE_PREFIX = {"expected": "expected", "projected": "projected", "actual": "leaky_actual"}
 
