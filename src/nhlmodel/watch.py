@@ -4,7 +4,8 @@
 
 Runs ``nhlmodel.live`` once, then watches the games starting within ``--window`` minutes: it polls their
 play-by-play rosterSpots every minute and, when a team's dressed lineup appears, reruns the pipeline (and the
-publish command) right away. It stops after ``--hours`` or once no game starts within ``--horizon`` hours.
+publish command) right away. Each polling minute it also reads the partner book's moneylines, so paper
+trading gets a closing price. It stops after ``--hours`` or once no game starts within ``--horizon`` hours.
 
 Why a watcher and not fixed run times (seen live on 2026-10-20): dressed lineups land in rosterSpots only
 5-15 minutes before puck drop, sometimes after it, and GitHub starts scheduled runs late or not at all (the
@@ -50,6 +51,7 @@ def run_pipeline(publish: str | None) -> None:
 def main(argv: list[str] | None = None) -> int:
     from .ingest.cli import lineup_status
     from .ingest.http import CachedClient
+    from .live import record_odds
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--hours", type=float, default=3, help="stop after this long")
@@ -72,6 +74,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{now:%H:%M}Z: no game starts within {args.horizon} h, done", flush=True)
             break
         if poll:
+            record_odds(cfg, client, now)
             snap = now.strftime("%Y%m%dT%H%M%SZ")
             games = up[up["game_id"].isin(poll) & ~up["game_id"].isin(posted)]
             new = {g.game_id for g in games.itertuples() if lineup_status(cfg, client, g, snap)[0]}

@@ -45,10 +45,12 @@ jobs:
           mkdir -p data/processed
           git archive FETCH_HEAD processed | tar -x --strip-components=1 -C data/processed
 
-      - name: Predictions log from the last published site
+      - name: Predictions and odds logs from the last published site
         run: |
           if git fetch --depth=1 origin site 2>/dev/null; then
-            git show FETCH_HEAD:predictions_log.csv > data/processed/predictions_log.csv || rm -f data/processed/predictions_log.csv
+            for f in predictions_log.csv odds_log.csv; do
+              git show FETCH_HEAD:$f > data/processed/$f || rm -f data/processed/$f
+            done
           fi
 
       # The raw NHL response cache carries over between runs, so each run downloads only new games.
