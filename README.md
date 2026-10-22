@@ -74,6 +74,11 @@ Where things stand as of 2026-10-21, so work can pick up from here.
   fixed run times. GitHub's cron started runs hours late or dropped them, and dressed lineups post only
   5-15 minutes before puck drop (`docs/lineup_timing.md`).
 
+- **2026-10-22:** recent-form ("hot streak") features for skaters, starters and teams
+  (`src/nhlmodel/features/form.py`, `docs/form_choices.md`). Goal-scoring and goalie streaks barely carry
+  over (slope 0.02-0.06 into the next games); no form feature beat the current model on dev or test, so
+  the live model is unchanged.
+
 ## Outstanding items
 
 Done since the last list: 5v5 player ratings (PR #2) and the lineup watcher that replaced fixed run times

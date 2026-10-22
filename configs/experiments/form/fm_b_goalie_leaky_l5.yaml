@@ -1,0 +1,8 @@
+id: fm_b_goalie_leaky_l5
+notes: "B + RAPM + ACTUAL starter's form, last 5 appearances (leaky upper bound)."
+model:
+  type: logreg
+  C: 0.01
+  groups: [xg_share, goalie, rest, home, rapm, form_goalie_leaky_l5]
+  window: std
+  goalie_variant: expected

@@ -21,6 +21,7 @@ import pandas as pd
 
 from ..config import load_config, repo_path
 from .asof import build_features
+from .form import goalie_form, skater_form, skater_games, team_form
 from .goalies import goalie_features, goalie_games_with_xg
 from ..ratings.rapm import player_ratings
 from ..ratings.stints import main as stints_main
@@ -36,15 +37,25 @@ def _read_seasons(kind: str, seasons) -> pd.DataFrame:
     return pd.concat([pd.read_parquet(p) for p in paths], ignore_index=True) if paths else pd.DataFrame()
 
 
-def _lineups(games: pd.DataFrame, events: pd.DataFrame, xg: pd.DataFrame, seasons, cfg: dict) -> pd.DataFrame:
-    """Player on-ice metrics (seasons with xG and shift charts) -> lineup features per team-game, plus the
-    lineup's RAPM ratings if the config has a ``rapm`` section."""
+def _lineups(games: pd.DataFrame, events: pd.DataFrame, xg: pd.DataFrame, seasons, cfg: dict):
+    """(features, members): player on-ice metrics (seasons with xG and shift charts) -> lineup features per
+    team-game, plus the lineup's RAPM ratings if the config has a ``rapm`` section; ``members`` is
+    ``players.lineup_members`` output."""
     sides, members = lineup_inputs(games, events, xg, seasons, cfg)
     out = lineup_features_from(sides, members)
     if "rapm" in cfg:
         ratings = player_ratings(load_stints(seasons), games, cfg["rapm"])
         out = out.merge(rapm_lineup_features(sides, members, ratings), on=["game_id", "team_id"], validate="one_to_one")
-    return out
+    return out, members
+
+
+def _form(games, events, xg, seasons, members, gg, cfg: dict) -> pd.DataFrame:
+    """Recent-form features per team-game (features/form.py): lineup skater form, starter form, team form."""
+    fcfg = cfg["form"]
+    sg = skater_games(events, xg, _read_seasons("rosters", seasons))
+    out = skater_form(members, sg, games, fcfg)
+    out = out.merge(goalie_form(gg, games, cfg["goalies"], fcfg), on=["game_id", "team_id"], how="left")
+    return out.merge(team_form(games, fcfg, cfg.get("lineage", {})), on=["game_id", "team_id"], how="left")
 
 
 def load_stints(seasons) -> pd.DataFrame:
@@ -108,7 +119,9 @@ def assemble(cfg: dict, data_cfg: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
                                 how="left").drop(columns=["team_id"])
 
     if "players" in cfg and xg is not None:
-        lf = _lineups(games, events, xg, seasons, cfg)
+        lf, members = _lineups(games, events, xg, seasons, cfg)
+        if "form" in cfg and gg is not None:
+            lf = lf.merge(_form(games, events, xg, seasons, members, gg, cfg), on=["game_id", "team_id"], how="left")
         cols = [c for c in lf.columns if c not in ("game_id", "team_id")]
         for side in ("home", "away"):
             side_f = lf.rename(columns={c: f"{side}_{c}" for c in cols})

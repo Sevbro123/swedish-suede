@@ -31,10 +31,13 @@ ADJUSTED_TAGS = ("_sa_", "_sva_")
 LINEUP_TAG = "lineup_"
 # Lineup RAPM ratings (ratings/rapm.py): ``features: full_rapm`` = the full_lineup matrix plus rapm_*.
 RAPM_TAG = "rapm_"
+# Recent-form features (features/form.py): ``features: full_rapm_form`` = full_rapm plus the ``form_columns``
+# listed in the config (all form_* columns if it lists none).
+FORM_TAG = "form_"
 
 
 def full_feature_names(frame: pd.DataFrame, adjusted: bool = False, lineup: bool = False,
-                       rapm: bool = False) -> list[str]:
+                       rapm: bool = False, form: bool | list[str] = False) -> list[str]:
     """Per-side features that have both a home_ and an away_ column and are known pre-game."""
     names = []
     for c in frame.columns:
@@ -50,6 +53,8 @@ def full_feature_names(frame: pd.DataFrame, adjusted: bool = False, lineup: bool
         if not lineup and base.startswith(LINEUP_TAG):
             continue
         if not rapm and base.startswith(RAPM_TAG):
+            continue
+        if base.startswith(FORM_TAG) and not (form is True or (isinstance(form, list) and base in form)):
             continue
         names.append(base)
     return sorted(names)
@@ -114,7 +119,9 @@ def actual_lineup(frame: pd.DataFrame) -> pd.DataFrame:
     """Lineup columns filled from the actual (``leaky_``) lineup: the posted lineup at puck drop."""
     f = frame.copy()
     for c in [c for c in f.columns if c.startswith(("home_leaky_lineup_", "away_leaky_lineup_",
-                                                    "home_leaky_rapm_", "away_leaky_rapm_"))]:
+                                                    "home_leaky_rapm_", "away_leaky_rapm_",
+                                                    *(f"{side}_leaky_form_{st}_" for side in ("home", "away")
+                                                      for st in ("pts", "goals", "ixg"))))]:
         f[c.replace("leaky_", "", 1)] = f[c]
     return f
 
@@ -124,8 +131,10 @@ def _inputs(cfg: dict[str, Any], train: pd.DataFrame, test: pd.DataFrame) -> tup
     if cfg.get("lineup") == "actual":
         train, test = actual_lineup(train), actual_lineup(test)
     feats = cfg.get("features", "full")
-    names = full_feature_names(train, adjusted=feats == "full_adjusted", lineup=feats in ("full_lineup", "full_rapm"),
-                               rapm=feats == "full_rapm")
+    form = (cfg.get("form_columns") or True) if feats == "full_rapm_form" else False
+    names = full_feature_names(train, adjusted=feats == "full_adjusted",
+                               lineup=feats in ("full_lineup", "full_rapm", "full_rapm_form"),
+                               rapm=feats in ("full_rapm", "full_rapm_form"), form=form)
     return train.sort_values("start_time_utc"), test, names
 
 

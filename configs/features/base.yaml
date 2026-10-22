@@ -72,3 +72,14 @@ goalies:
 rapm:
   lam: 300
   halflife_months: 24
+
+# Recent form (features/form.py): lineup skaters' points / goals / own-shot xG per game over their last N games
+# minus their own long-run rate, the expected starter's GSAx/100 over his last N appearances minus his career
+# rate, and the team's recent win rate and streak. The full matrix leaves form_* out unless a config sets
+# ``features: full_rapm_form``.
+form:
+  windows: [5, 10, 20]            # skater and team windows, in games
+  goalie_windows: [3, 5, 10]      # goalie appearances
+  baseline_halflife_games: 82     # a skater's norm: decayed per-game rate, about one season's half-life
+  baseline_pseudo_games: 20       # ... shrunk toward the league rate for his position (F / D)
+  goalie_recent_pseudo_shots: 100 # recent GSAx/100 shrunk toward 0 (about 4 starts of shots)
