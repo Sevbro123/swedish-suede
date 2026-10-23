@@ -1,0 +1,8 @@
+id: el_logreg_full_C0.001
+notes: "Live model (full matrix + projected lineup + RAPM, C=0.001) + both teams' Elo results rating."
+model:
+  type: logreg
+  params:
+    C: 0.001
+  features: full_rapm_elo
+  calibration: none

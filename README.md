@@ -11,7 +11,7 @@ de-vigged market, with time-ordered validation and confidence intervals.
 | Phase | State |
 |---|---|
 | 0 Data discovery | done: [`docs/phase0_data_discovery.md`](docs/phase0_data_discovery.md) (live-verified) |
-| 1 Dataset & features | mostly done: 16 seasons ingested; xG, goalie, team-strength, situational and score/venue-adjusted features (`docs/score_venue_choices.md`), lineup features from player on-ice xG (`docs/lineup_choices.md`), teammate/opponent-adjusted player ratings (RAPM, `docs/player_ratings_choices.md`). Remaining: EDGE |
+| 1 Dataset & features | mostly done: 16 seasons ingested; xG, goalie, team-strength, situational and score/venue-adjusted features (`docs/score_venue_choices.md`), lineup features from player on-ice xG (`docs/lineup_choices.md`), teammate/opponent-adjusted player ratings (RAPM, `docs/player_ratings_choices.md`), Elo results rating (`docs/elo_choices.md`). Remaining: EDGE |
 | 2 Baselines | done: see results below and `docs/eval_protocol.md` |
 | 3 Model families | done: see results below and `docs/phase3_choices.md` |
 | 4 Live predictions | done: `python -m nhlmodel.live`, scheduled GitHub Action, site on Vercel (see Live use and Hosting below) |
@@ -47,8 +47,8 @@ between runs on the `site` branch and published with the page.
 Things that can still change (the schedule, games final for under a day, the goalie table, posted
 lineups) are stored as dated snapshots; per-game data becomes permanent once a game has been final for
 24 h, so NHL stat corrections are picked up. Shift charts the NHL hasn't posted yet (48 early 2026-27
-games so far) are retried on every update. Predictions use the full model with the projected lineup and its
-adjusted player ratings (`rp_logreg_full_C0.001`), or, once both teams have posted a lineup, the same model
+games so far) are retried on every update. Predictions use the full model with the projected lineup, its
+adjusted player ratings and both teams' Elo rating (`el_logreg_full_C0.001`), or, once both teams have posted a lineup, the same model
 trained with actual lineups. Each prediction is also split into per-stat terms (`explain_upcoming.parquet`;
 the model is a standardized logistic regression, so the split is exact), and each upcoming-game card on the
 site opens a page showing what pushes it toward either team.
@@ -78,6 +78,11 @@ Where things stand as of 2026-10-21, so work can pick up from here.
   (`src/nhlmodel/features/form.py`, `docs/form_choices.md`). Goal-scoring and goalie streaks barely carry
   over (slope 0.02-0.06 into the next games); no form feature beat the current model on dev or test, so
   the live model is unchanged.
+- **2026-10-23:** audit of missing inputs. Four candidates were added to the live model with settings fixed
+  in advance: travel distance and road-trip length, each team's own home/road split, and the projected
+  starter's rest all stayed within noise. An Elo results rating (`src/nhlmodel/features/elo.py`,
+  `docs/elo_choices.md`) beat the live model on dev and test, so the live model switched to the full model +
+  RAPM + Elo (`el_logreg_full` configs).
 
 ## Outstanding items
 
@@ -148,8 +153,10 @@ Log loss with 95% day-block bootstrap intervals; full table in `results/experime
 | Logistic, full matrix + *actual* lineup | 0.6721 | 0.6642 [0.6593, 0.6688] |
 | B + projected lineup's adjusted player ratings (RAPM) | 0.6737 | 0.6649 [0.6603, 0.6696] |
 | B + *actual* lineup's RAPM (leaky upper bound) | 0.6734 | 0.6642 |
-| Logistic, full matrix + projected lineup + RAPM (C=0.001), **live model** | 0.6719 | **0.6643** [0.6595, 0.6692] |
-| Logistic, full matrix + *actual* lineup + RAPM (live model once lineups are posted) | 0.6717 | 0.6638 [0.6588, 0.6686] |
+| Logistic, full matrix + projected lineup + RAPM (C=0.001) | 0.6719 | 0.6643 [0.6595, 0.6692] |
+| Logistic, full matrix + *actual* lineup + RAPM | 0.6717 | 0.6638 [0.6588, 0.6686] |
+| Logistic, full matrix + projected lineup + RAPM + Elo (C=0.001), **live model** | 0.6716 | **0.6638** [0.6588, 0.6688] |
+| Logistic, full matrix + *actual* lineup + RAPM + Elo (live model once lineups are posted) | 0.6714 | 0.6632 [0.6583, 0.6681] |
 | Logistic regression, full 140-column matrix (C=0.001) | 0.6727 [0.6683, 0.6770] | **0.6650** [0.6602, 0.6696] |
 | Random forest (leaf 200), same matrix | 0.6751 [0.6712, 0.6791] | 0.6671 [0.6628, 0.6714] |
 | LightGBM (2-leaf trees), same matrix | 0.6747 [0.6704, 0.6790] | 0.6670 [0.6628, 0.6710] |
@@ -180,6 +187,11 @@ Baseline B by -0.00138 [-0.00268, -0.00009], the first projected-lineup feature 
 test, so the spec's adoption rule holds. Against the quick lineup features it is -0.00060 [-0.00135,
 +0.00009] in Baseline B and -0.00031 [-0.00070, +0.00007] in the full model (both within noise, better in
 both periods). The live model switched to the full model + RAPM, as the frozen rule allowed.
+
+Elo results rating (`docs/elo_choices.md`): each team's Elo from the wins and goal margins of its earlier
+games, settings fixed in advance. Added to the live model it gives -0.00026 [-0.00049, -0.00005] on dev and
+-0.00055 [-0.00084, -0.00026] on test (actual-lineup version: -0.00026 dev, -0.00053 [-0.00081, -0.00024]
+test), the largest single gain since lineups. The live model switched to the `el_logreg_full` configs.
 
 The full model with the actual lineup beats the same model with the projected lineup on test by
 -0.00047 [-0.00086, -0.00008] (dev: -0.00012, within noise). It is an upper bound for backtests, and the
