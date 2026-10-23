@@ -83,3 +83,10 @@ form:
   baseline_halflife_games: 82     # a skater's norm: decayed per-game rate, about one season's half-life
   baseline_pseudo_games: 20       # ... shrunk toward the league rate for his position (F / D)
   goalie_recent_pseudo_shots: 100 # recent GSAx/100 shrunk toward 0 (about 4 starts of shots)
+
+# Elo results rating (features/elo.py): wins and goal margins of earlier games. Fixed in advance, not tuned.
+# The full matrix leaves elo_* out unless a config sets ``features: full_rapm_elo``.
+elo:
+  k: 6                 # rating points per unit of ln(|goal margin| + 1)
+  hfa: 35              # home edge in the expected result, in Elo points (none at neutral sites)
+  carry: 0.7           # share of a rating's distance from 1500 kept into the next season

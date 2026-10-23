@@ -34,10 +34,12 @@ RAPM_TAG = "rapm_"
 # Recent-form features (features/form.py): ``features: full_rapm_form`` = full_rapm plus the ``form_columns``
 # listed in the config (all form_* columns if it lists none).
 FORM_TAG = "form_"
+# Elo results rating (features/elo.py): ``features: full_rapm_elo`` = full_rapm plus elo_*.
+ELO_TAG = "elo_"
 
 
 def full_feature_names(frame: pd.DataFrame, adjusted: bool = False, lineup: bool = False,
-                       rapm: bool = False, form: bool | list[str] = False) -> list[str]:
+                       rapm: bool = False, form: bool | list[str] = False, elo: bool = False) -> list[str]:
     """Per-side features that have both a home_ and an away_ column and are known pre-game."""
     names = []
     for c in frame.columns:
@@ -53,6 +55,8 @@ def full_feature_names(frame: pd.DataFrame, adjusted: bool = False, lineup: bool
         if not lineup and base.startswith(LINEUP_TAG):
             continue
         if not rapm and base.startswith(RAPM_TAG):
+            continue
+        if not elo and base.startswith(ELO_TAG):
             continue
         if base.startswith(FORM_TAG) and not (form is True or (isinstance(form, list) and base in form)):
             continue
@@ -133,8 +137,9 @@ def _inputs(cfg: dict[str, Any], train: pd.DataFrame, test: pd.DataFrame) -> tup
     feats = cfg.get("features", "full")
     form = (cfg.get("form_columns") or True) if feats == "full_rapm_form" else False
     names = full_feature_names(train, adjusted=feats == "full_adjusted",
-                               lineup=feats in ("full_lineup", "full_rapm", "full_rapm_form"),
-                               rapm=feats in ("full_rapm", "full_rapm_form"), form=form)
+                               lineup=feats in ("full_lineup", "full_rapm", "full_rapm_form", "full_rapm_elo"),
+                               rapm=feats in ("full_rapm", "full_rapm_form", "full_rapm_elo"), form=form,
+                               elo=feats == "full_rapm_elo")
     return train.sort_values("start_time_utc"), test, names
 
 

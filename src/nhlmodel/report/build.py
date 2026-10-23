@@ -75,7 +75,8 @@ RUN_INFO = {
     "lu_logreg_full_C0.001": ("Full model + expected lineup", "All ~140 stats plus ratings of the players expected to dress.", "main"),
     "rp_b": ("Simple model + adjusted player ratings", "Rates each expected player for the chances their team creates and allows with them on the ice, adjusted for teammates and opponents.", "main"),
     "rp_b_leaky": ("Simple model + real lineup's adjusted ratings", "Same, with the lineup that actually played, which is only certain at puck drop.", "upper"),
-    "rp_logreg_full_C0.001": ("Full model + adjusted player ratings", "The full model with expected lineup, plus the adjusted player ratings. This is the live model.", "main"),
+    "rp_logreg_full_C0.001": ("Full model + adjusted player ratings", "The full model with expected lineup, plus the adjusted player ratings.", "main"),
+    "el_logreg_full_C0.001": ("Full model + Elo rating", "The full model with adjusted player ratings, plus each team's Elo rating from its wins and goal margins. This is the live model.", "main"),
 }
 _DETAIL_PREFIX = {
     "baseline_b_C": "Simple model, tuning",
@@ -87,6 +88,7 @@ _DETAIL_PREFIX = {
     "adj_": "Score/arena adjustment check",
     "lu_": "Player lineup check",
     "rp_": "Adjusted player ratings check",
+    "el_": "Elo rating check",
 }
 
 
@@ -118,7 +120,7 @@ def experiments() -> dict | None:
     return {"rows": rows}
 
 
-BEST_TEST_RUN = "rp_logreg_full_C0.001__test"  # the deployable model's held-out predictions
+BEST_TEST_RUN = "el_logreg_full_C0.001__test"  # the deployable model's held-out predictions
 
 
 def _ll(y, p) -> float:
@@ -162,6 +164,7 @@ _SINGLE = {  # name -> (group, label, format)
     "rapm_off": ("Players in the lineup", "lineup's adjusted offense rating (xG/60 created above average)", "signed2"),
     "rapm_def": ("Players in the lineup", "lineup's adjusted defense rating (xG/60 prevented above average)", "signed2"),
     "rapm_net": ("Players in the lineup", "lineup's adjusted overall rating (offense + defense)", "signed2"),
+    "elo_rating": ("Results", "Elo rating from wins and goal margins (1500 = average)", "int"),
     "rest_days": ("Rest and schedule", "days of rest", "int"),
     "back_to_back": ("Rest and schedule", "played yesterday", "yesno"),
     "season_opener": ("Rest and schedule", "season opener", "yesno"),

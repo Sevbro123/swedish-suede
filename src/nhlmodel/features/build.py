@@ -21,6 +21,7 @@ import pandas as pd
 
 from ..config import load_config, repo_path
 from .asof import build_features
+from .elo import elo_ratings
 from .form import goalie_form, skater_form, skater_games, team_form
 from .goalies import goalie_features, goalie_games_with_xg
 from ..ratings.rapm import player_ratings
@@ -106,6 +107,12 @@ def assemble(cfg: dict, data_cfg: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     tg = build_team_games(events, games, xg, cfg.get("adjust"))
     feats = build_features(games, tg, cfg)
+    if "elo" in cfg:
+        er = elo_ratings(games, cfg["elo"], cfg.get("lineage", {}))
+        for side in ("home", "away"):
+            feats = feats.merge(er.rename(columns={"elo_rating": f"{side}_elo_rating"}),
+                                left_on=["game_id", f"{side}_team_id"], right_on=["game_id", "team_id"],
+                                how="left").drop(columns=["team_id"])
 
     gg = goalie_games_with_xg(xg, _read_seasons("goalie_games", seasons), done) if xg is not None else None
     if gg is not None:
