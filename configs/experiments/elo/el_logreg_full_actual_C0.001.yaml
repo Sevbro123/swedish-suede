@@ -1,0 +1,9 @@
+id: el_logreg_full_actual_C0.001
+notes: "Full matrix + lineup features + RAPM from the ACTUAL lineup + Elo (leaky upper bound in backtests; deployable once lineups are posted)."
+model:
+  type: logreg
+  params:
+    C: 0.001
+  features: full_rapm_elo
+  lineup: actual
+  calibration: none

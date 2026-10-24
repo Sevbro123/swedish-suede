@@ -4,10 +4,10 @@
 
 Trains on every completed game and predicts each team's next game from data/processed/upcoming.parquet.
 Two models, both frozen configs:
-- projected lineup (previous game's skaters): ``rp_logreg_full_C0.001`` (full matrix, lineup features and
-  the lineup's RAPM ratings; see docs/player_ratings_choices.md)
+- projected lineup (previous game's skaters): ``el_logreg_full_C0.001`` (full matrix, lineup features, the
+  lineup's RAPM ratings and both teams' Elo rating; see docs/player_ratings_choices.md and features/elo.py)
 - confirmed lineup, once both teams have posted one (``cli update`` near puck drop):
-  ``rp_logreg_full_actual_C0.001``, trained with actual lineups in the lineup and RAPM columns
+  ``el_logreg_full_actual_C0.001``, trained with actual lineups in the lineup and RAPM columns
 A game is predicted only when it is each team's next game, so no unplayed game sits in its history.
 
 Writes data/processed/predictions_upcoming.parquet (and explain_upcoming.parquet: each prediction split into
@@ -23,8 +23,8 @@ import pandas as pd
 from .config import load_config, repo_path
 from .models.families import explain_family
 
-PROJECTED = "configs/experiments/rapm/rp_logreg_full_C0.001.yaml"
-CONFIRMED = "configs/experiments/rapm/rp_logreg_full_actual_C0.001.yaml"
+PROJECTED = "configs/experiments/elo/el_logreg_full_C0.001.yaml"
+CONFIRMED = "configs/experiments/elo/el_logreg_full_actual_C0.001.yaml"
 
 
 def next_games(up: pd.DataFrame) -> pd.DataFrame:
