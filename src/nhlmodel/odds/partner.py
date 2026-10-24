@@ -4,7 +4,7 @@ The endpoint has current prices only, no history (docs/phase0_data_discovery.md 
 records them going forward: every live run, and every minute the watcher polls games about to start,
 appends the prices to the odds log. Rows carry the NHL game id, so no team-name matching is needed.
 
-Odds log (data/processed/odds_log.csv), one row per (game, price change):
+Odds log (data/processed/odds_log.csv), one row per (game, price change, or at least every 25 min):
 
     game_id           int     NHL game id
     observed_at       str     UTC ISO time we read the price (the live run's ``now``)
@@ -70,12 +70,16 @@ def fetch(client: CachedClient, now: pd.Timestamp, country: str = "US") -> pd.Da
     return parse(data).assign(observed_at=now.isoformat())[ODDS_COLS]
 
 
-def append_log(log: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
-    """Add ``new`` prices, skipping any game whose price hasn't changed since its last logged row."""
+def append_log(log: pd.DataFrame, new: pd.DataFrame, refresh_min: float = 25) -> pd.DataFrame:
+    """Add ``new`` prices, skipping a game whose price hasn't changed since its last logged row, unless that
+    row is more than ``refresh_min`` old: the log keeps a fresh row for every run, so a bet can always find
+    the price its own run read (paper trading only bets at a price read shortly before the prediction)."""
     if new.empty:
         return log
     if len(log):
         last = log.sort_values("observed_at").groupby("game_id").tail(1).set_index("game_id")
         prev = new["game_id"].map(last["home_ml"]), new["game_id"].map(last["away_ml"])
-        new = new[~((prev[0] == new["home_ml"]) & (prev[1] == new["away_ml"]))]
+        age = pd.to_datetime(new["observed_at"], utc=True) - pd.to_datetime(new["game_id"].map(last["observed_at"]), utc=True)
+        same = (prev[0] == new["home_ml"]) & (prev[1] == new["away_ml"])
+        new = new[~(same & (age <= pd.Timedelta(minutes=refresh_min)))]
     return pd.concat([log, new], ignore_index=True)[ODDS_COLS]

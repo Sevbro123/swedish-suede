@@ -31,14 +31,15 @@ def test_to_american_reads_decimal_prices():
     assert to_american(None) is None and to_american("x") is None
 
 
-def test_append_log_skips_unchanged_prices():
-    row = lambda t, h, a: {"game_id": 1, "observed_at": t, "home_ml": h, "away_ml": a, "book": "B",
-                           "odds_updated_utc": "", "source": "s"}
-    log = pd.DataFrame([row("t1", -150, 130)], columns=ODDS_COLS)
-    log = append_log(log, pd.DataFrame([row("t2", -150, 130)]))
+def test_append_log_skips_unchanged_prices_but_refreshes_old_ones():
+    row = lambda m, h, a: {"game_id": 1, "observed_at": (T + pd.Timedelta(minutes=m)).isoformat(), "home_ml": h,
+                           "away_ml": a, "book": "B", "odds_updated_utc": "", "source": "s"}
+    log = pd.DataFrame([row(0, -150, 130)], columns=ODDS_COLS)
+    log = append_log(log, pd.DataFrame([row(1, -150, 130)]))      # unchanged, fresh: skipped
     assert len(log) == 1
-    log = append_log(log, pd.DataFrame([row("t3", -160, 140)]))
-    assert log["observed_at"].tolist() == ["t1", "t3"]
+    log = append_log(log, pd.DataFrame([row(2, -160, 140)]))      # changed: kept
+    log = append_log(log, pd.DataFrame([row(40, -160, 140)]))     # unchanged but last row 38 min old: kept
+    assert [pd.Timestamp(t) - T for t in log["observed_at"]] == [pd.Timedelta(minutes=m) for m in (0, 2, 40)]
 
 
 def _odds(rows):
