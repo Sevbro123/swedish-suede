@@ -42,16 +42,46 @@ function fromHsl([h, s, l]: RGB): RGB {
 }
 const chromatic = (c: number[]) => { const [, s, l] = hsl(c); return s >= 0.2 && l > 0.08 && l < 0.92; };
 
-// Surfaces the accent must read on, per mode (bg and card).
-const SURFACES = { light: ["#f5f5f7", "#ffffff"], dark: ["#000000", "#1c1c1e", "#2c2c2e"] };
+const hueGap = (a: number[], b: number[]) => { const d = Math.abs(hsl(a)[0] - hsl(b)[0]) % 360; return Math.min(d, 360 - d); };
+const mix = (a: number[], b: number[], t: number) => a.map((v, i) => v + (b[i]! - v) * t);
 
-/** The team's first chromatic color, moved in lightness until it reaches 4.6:1 on every surface (4.6: margin for hex rounding). */
-export function teamAccent(colors: string[], mode: "light" | "dark"): string {
-  const cs = colors.map(rgbOf), c = cs.find(chromatic) ?? cs[0]!, surfaces = SURFACES[mode].map(rgbOf);
+/** Base surfaces per mode; a team theme tints them. Keep in sync with :root in index.css. */
+export const BASE = {
+  dark: { bg: "#080a10", surface: "#121621", surface2: "#1a1f2c" },
+  light: { bg: "#eef1f6", surface: "#ffffff", surface2: "#f2f4f8" },
+};
+
+/** Move a color's lightness away from the surfaces until it reaches `min` contrast with every one. */
+function readable(c: number[], surfaces: number[][], min: number, mode: "light" | "dark"): number[] {
   const [h, s, l0] = hsl(c), dir = mode === "dark" ? 1 : -1;
   for (let l = l0; l >= 0 && l <= 1; l += dir * 0.01) {
     const out = fromHsl([h, s, l]);
-    if (surfaces.every((bg) => contrast(out, bg) >= 4.6)) return hexOf(out);
+    if (surfaces.every((bg) => contrast(out, bg) >= min)) return out;
   }
-  return mode === "dark" ? "#ffffff" : "#000000";
+  return mode === "dark" ? [255, 255, 255] : [0, 0, 0];
+}
+
+/** The whole palette for one team in one mode: tinted surfaces, accent, and the home/away series colors.
+ *  Series colors keep 4.6:1 on every surface (labels are drawn in them; 4.6 leaves margin for hex rounding). */
+export function teamPalette(colors: string[], mode: "light" | "dark"): Record<string, string> {
+  const cs = colors.map(rgbOf), c1 = cs.find(chromatic) ?? cs[0]!;
+  const c2raw = cs.find((c) => c !== c1 && chromatic(c) && hueGap(c, c1) >= 35);
+  const b = BASE[mode], t = mode === "dark" ? 1 : 0.5;
+  const bg = mix(rgbOf(b.bg), c1, 0.07 * t), surface = mix(rgbOf(b.surface), c1, 0.06 * t), surface2 = mix(rgbOf(b.surface2), c1, 0.08 * t);
+  const surfaces = [bg, surface, surface2];
+  const home = readable(c1, surfaces, 4.6, mode);
+  let away: number[];
+  if (c2raw) away = readable(c2raw, surfaces, 4.6, mode);
+  else {
+    // one-color team: the away series is the same hue pushed further from the surfaces, so the two still separate by lightness
+    const [h, s, l] = hsl(home), l2 = mode === "dark" ? Math.min(0.92, l + 0.22) : Math.max(0.12, l - 0.2);
+    away = fromHsl([(h + 25) % 360, Math.max(0.35, s), l2]);
+  }
+  const rgb = (c: number[]) => c.map(Math.round).join(" ");
+  return {
+    "--bg": hexOf(bg), "--surface-solid": hexOf(surface), "--surface-2": hexOf(surface2),
+    "--accent": hexOf(home), "--accent-ink": contrast(home, [255, 255, 255]) >= 4.5 ? "#ffffff" : "#000000",
+    "--home": hexOf(home), "--away": hexOf(away),
+    "--glow-a": rgb(c1), "--glow-b": rgb(c2raw ?? away),
+  };
 }
