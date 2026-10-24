@@ -1,4 +1,4 @@
-"""Build and serve the front end (a retro game-menu page of the project's results).
+"""Build and serve the front end (the results page; its source is the React app in web/).
 
     python -m nhlmodel.report build          # -> site/index.html (self-contained)
     python -m nhlmodel.report serve [--port 8000]   # build, then serve on 127.0.0.1 only

@@ -26,7 +26,7 @@ def test_build_embeds_real_payload(tmp_path):
 
 
 def test_team_palettes_cover_the_32_teams():
-    rows = re.findall(r'\["([A-Z]{3})", "[^"]+", \[((?:"#[0-9A-Fa-f]{6}",? ?)+)\]\]', TEMPLATE.read_text())
+    rows = re.findall(r'\["([A-Z]{3})",\s*"[^"]+",\s*\[((?:"#[0-9A-Fa-f]{6}",?\s*)+)\]\]', TEMPLATE.read_text())
     assert len(rows) == 32 and len({ab for ab, _ in rows}) == 32
 
 
