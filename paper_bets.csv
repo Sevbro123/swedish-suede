@@ -1,0 +1,2 @@
+game_id,date,start_utc,away,home,made_at,lineup,p_home,home_ml,away_ml,book,p_mkt_home,edge_home,side,edge,price,stake,close_home_ml,close_away_ml,clv,status,profit,profit_flat
+2026020162,2026-10-22,2026-10-23T01:00:00+00:00,MIN,CGY,2026-10-23T00:56:34.615005+00:00,confirmed,0.2928402579435631,180,-218,DraftKings,0.3425247738043946,-0.0496845158608315,away,0.0496845158608315,-218.0,1.0,180,-218,0.0,lost,-1.0,-1.0
