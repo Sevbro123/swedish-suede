@@ -53,6 +53,13 @@ trained with actual lineups. Each prediction is also split into per-stat terms (
 the model is a standardized logistic regression, so the split is exact), and each upcoming-game card on the
 site opens a page showing what pushes it toward either team.
 
+**Front end.** The page is a React app in `web/` (Vite, Tailwind, [motion](https://motion.dev) for
+transitions, charts from [bklit-ui](https://github.com/bklit/bklit-ui) vendored in `web/src/bklit/`, MIT).
+`cd web && npm install && npm run build` bundles it into one self-contained HTML file and copies it over
+`src/nhlmodel/report/template.html`, which is committed, so the live workflow needs no Node: `report/build.py`
+only swaps the data placeholder for the payload. For `npm run dev`, save a payload as
+`web/public/dev-payload.json` (the JSON inside `<script id="payload">` of a built page).
+
 ## Progress log
 
 Where things stand as of 2026-10-21, so work can pick up from here.
