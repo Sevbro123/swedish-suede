@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, type PanInfo } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { contrast, TEAMS, teamAccent } from "./teams";
+import { TEAMS, teamPalette } from "./teams";
 import { Segmented } from "./ui";
 
 type Theme = "system" | "light" | "dark";
@@ -10,9 +10,10 @@ const store = {
   set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* unavailable */ } },
 };
 const dark = matchMedia("(prefers-color-scheme: dark)");
+const PALETTE_KEYS = Object.keys(teamPalette(TEAMS[0]![2], "dark"));
 
 export function usePrefs() {
-  const [theme, setTheme] = useState<Theme>(() => (["light", "dark"].includes(store.get("suede.theme") ?? "") ? store.get("suede.theme") as Theme : "system"));
+  const [theme, setTheme] = useState<Theme>(() => (["light", "system"].includes(store.get("suede.theme") ?? "") ? store.get("suede.theme") as Theme : "dark"));
   const [team, setTeam] = useState(() => (TEAMS.some((t) => t[0] === store.get("suede.team")) ? store.get("suede.team")! : ""));
   const [motionPref, setMotion] = useState<MotionPref>(() => (store.get("suede.fx") === "off" ? "reduced" : "full"));
   const [sys, setSys] = useState(dark.matches);
@@ -22,12 +23,8 @@ export function usePrefs() {
   useLayoutEffect(() => {
     const root = document.documentElement;
     root.dataset.theme = mode;
-    const t = TEAMS.find((x) => x[0] === team);
-    if (t) {
-      const a = teamAccent(t[2], mode), rgb = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
-      root.style.setProperty("--accent", a);
-      root.style.setProperty("--accent-ink", contrast(rgb, [255, 255, 255]) >= 4.5 ? "#ffffff" : "#000000");
-    } else { root.style.removeProperty("--accent"); root.style.removeProperty("--accent-ink"); }
+    const t = TEAMS.find((x) => x[0] === team), vars = t ? teamPalette(t[2], mode) : null;
+    for (const k of PALETTE_KEYS) { if (vars) root.style.setProperty(k, vars[k]!); else root.style.removeProperty(k); }
   }, [mode, team]);
 
   return {
@@ -35,7 +32,7 @@ export function usePrefs() {
     setTheme: (v: Theme) => {
       // ease the brightness jump between light and dark
       document.documentElement.classList.add("theme-fade"); setTimeout(() => document.documentElement.classList.remove("theme-fade"), 320);
-      setTheme(v); store.set("suede.theme", v === "system" ? "" : v);
+      setTheme(v); store.set("suede.theme", v);
     },
     setTeam: (v: string) => { setTeam(v); store.set("suede.team", v); },
     setMotion: (v: MotionPref) => { setMotion(v); store.set("suede.fx", v === "reduced" ? "off" : "on"); },
@@ -67,30 +64,30 @@ export function Settings({ open, onClose, prefs }: { open: boolean; onClose: () 
   return (
     <AnimatePresence>
       {open && [
-        <motion.div key="scrim" className="fixed inset-0 z-40" style={{ background: isPhone ? "var(--scrim)" : "transparent" }}
+        <motion.div key="scrim" className="fixed inset-0 z-40" style={{ background: "var(--scrim)", WebkitBackdropFilter: "blur(6px)", backdropFilter: "blur(6px)" }}
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} onClick={onClose} />,
         <motion.div key="panel" ref={panel} role="dialog" aria-modal="true" aria-label="Settings" tabIndex={-1}
           className={`glass fixed z-50 overflow-y-auto outline-none ${isPhone
             ? "inset-x-0 bottom-0 max-h-[85vh] rounded-t-[22px] px-5 pt-2 pb-[calc(24px+env(safe-area-inset-bottom))]"
-            : "top-[60px] right-[max(16px,calc((100vw-1080px)/2+16px))] max-h-[calc(100vh-80px)] w-[380px] origin-top-right rounded-[18px] p-5"}`}
+            : "inset-0 m-auto h-fit max-h-[calc(100vh-64px)] w-[min(640px,calc(100vw-32px))] rounded-[20px] border border-line p-6"}`}
           style={{ boxShadow: "var(--shadow-lg)" }}
           {...(isPhone ? { ...sheet, drag: "y" as const, dragConstraints: { top: 0, bottom: 0 }, dragElastic: { top: 0.05, bottom: 0.9 }, onDragEnd: dragEnd } : pop)}>
           {isPhone && <div aria-hidden className="mx-auto mb-3 h-[5px] w-9 rounded-full bg-[var(--line-strong)]" />}
           <div className="flex items-center justify-between">
-            <h2 className="t-head m-0">Settings</h2>
+            <div><div className="t-kicker">Menu</div><h2 className="m-0 mt-1 text-[1.5rem] font-bold tracking-[-0.02em]">Settings</h2></div>
             <button type="button" onClick={onClose} className="press rounded-full px-3 py-1 text-[0.9375rem] font-medium text-accent hover:bg-surface-2">Done</button>
           </div>
           <Row label="Appearance">
-            <Segmented id="theme" label="Appearance" value={prefs.theme} onChange={prefs.setTheme} options={[["system", "Auto"], ["light", "Light"], ["dark", "Dark"]]} />
+            <Segmented id="theme" label="Appearance" value={prefs.theme} onChange={prefs.setTheme} options={[["dark", "Dark"], ["light", "Light"], ["system", "Auto"]]} />
           </Row>
           <Row label="Motion" note="Reduced swaps movement for simple fades. Your device setting is respected either way.">
             <Segmented id="motion" label="Motion" value={prefs.motion} onChange={prefs.setMotion} options={[["full", "Full"], ["reduced", "Reduced"]]} />
           </Row>
           <div className="border-t border-line pt-4">
             <div className="text-[0.9375rem] font-medium">Team color</div>
-            <p className="t-cap m-0 mt-0.5 mb-3">Tints buttons and links. Charts keep their own colors so they stay easy to read.</p>
-            <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5">
-              {[["", "Default", ["#0071e3", "#2997ff"]] as [string, string, string[]], ...TEAMS].map(([ab, name, cols]) => (
+            <p className="t-cap m-0 mt-0.5 mb-3">Recolors the whole app: menus, backgrounds, win bars and charts. Colors are adjusted so text stays readable.</p>
+            <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-8">
+              {[["", "Default", ["#2a9fd0", "#8a72ea"]] as [string, string, string[]], ...TEAMS].map(([ab, name, cols]) => (
                 <button key={ab || "none"} type="button" aria-pressed={prefs.team === ab} aria-label={name} data-tip={name} onClick={() => prefs.setTeam(ab)}
                   className={`press flex flex-col items-center gap-1 rounded-[10px] py-2 text-[0.6875rem] font-medium ${prefs.team === ab ? "bg-surface-2 text-ink ring-2 ring-accent" : "text-ink-2 hover:bg-surface-2"}`}>
                   <span aria-hidden className="flex">
