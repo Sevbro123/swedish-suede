@@ -62,7 +62,7 @@ only swaps the data placeholder for the payload. For `npm run dev`, save a paylo
 
 ## Progress log
 
-Where things stand as of 2026-10-21, so work can pick up from here.
+Where things stand as of 2026-10-24, so work can pick up from here.
 
 - **2026-10-19:** Phases 0-3 done. Logistic regression on the full feature matrix with strong shrinkage
   (C=0.001) beat random forest and LightGBM on the test period; calibration didn't help.
@@ -81,6 +81,13 @@ Where things stand as of 2026-10-21, so work can pick up from here.
   fixed run times. GitHub's cron started runs hours late or dropped them, and dressed lineups post only
   5-15 minutes before puck drop (`docs/lineup_timing.md`).
 
+- **2026-10-21, PR #7:** paper trading on the NHL partner book's moneylines (`src/nhlmodel/paper.py`,
+  `configs/paper.yaml`, odds log carried on the `site` branch, new Paper bets page). See Paper trading below.
+- **2026-10-22, PR #9:** paper stakes scale with the edge (1u/2u/3u at 3/5/8 points), a flat 1u benchmark is
+  kept beside it, and a daily 0.5u parlay of the strongest 2-3 picks (`paper_parlays.csv`).
+- **2026-10-22, PR #10:** the odds log keeps a fresh row at least every 25 minutes even when the price
+  hasn't moved. Before, unchanged prices were skipped, bets failed the price-freshness rule and Oct 22 had
+  no bets.
 - **2026-10-22:** recent-form ("hot streak") features for skaters, starters and teams
   (`src/nhlmodel/features/form.py`, `docs/form_choices.md`). Goal-scoring and goalie streaks barely carry
   over (slope 0.02-0.06 into the next games); no form feature beat the current model on dev or test, so
@@ -89,12 +96,19 @@ Where things stand as of 2026-10-21, so work can pick up from here.
   in advance: travel distance and road-trip length, each team's own home/road split, and the projected
   starter's rest all stayed within noise. An Elo results rating (`src/nhlmodel/features/elo.py`,
   `docs/elo_choices.md`) beat the live model on dev and test, so the live model switched to the full model +
-  RAPM + Elo (`el_logreg_full` configs).
+  RAPM + Elo (`el_logreg_full` configs). Merged as PR #11 on 2026-10-24.
+- **2026-10-24, PR #12:** front end rebuilt as a React app in `web/` (Apple-style design, bklit-ui charts,
+  motion transitions; see Front end above), replacing the game-menu page. The Shot Quality, The Data and
+  What-if Calculator sections had been dropped on 2026-10-21. Pages now: Overview, Upcoming, Paper bets,
+  Models, Game log, plus a Settings sheet. The Overview page has a reader-facing What's new list
+  (`NEWS` in `web/src/pages/Overview.tsx`); add a line there when something visible changes.
+- **2026-10-24, PRs #12-13:** repo skills for Claude sessions in `.claude/skills/`: `ponytail`
+  (token-saving rules), `apple-design` and `emil-design-eng` (front-end design and animation guidance).
 
 ## Outstanding items
 
-Done since the last list: 5v5 player ratings (PR #2) and the lineup watcher that replaced fixed run times
-(PR #3). Open work, in rough priority order:
+Done since the last list: 5v5 player ratings (PR #2), the lineup watcher that replaced fixed run times
+(PR #3), forward paper trading (PRs #7, #9, #10), the Elo rating (PR #11) and the new front end (PR #12). Open work, in rough priority order:
 
 1. **Lineups that post after puck drop.** Checked live on 2026-10-20 (`docs/lineup_timing.md`): dressed
    lineups land in rosterSpots 5-15 minutes before puck drop, and for 4 of 11 games only after it. The watcher
@@ -120,7 +134,7 @@ chance beats the no-vig price by 3+ points (closer is a toss-up: no bet). The st
 (1u at 3-5 points, 2u at 5-8, 3u at 8+), and a flat 1u version of the same bets is kept as a benchmark.
 When 2+ games on a day clear 5 points, the strongest (up to 3) also go into a 0.5u parlay, kept in
 `paper_parlays.csv` (carried on the `site` branch) and locked once its first game starts. The last price
-before puck drop is the close (for CLV). Rules are in `configs/paper.yaml`; the site's Paper trading page
+before puck drop is the close (for CLV). Rules are in `configs/paper.yaml`; the site's Paper bets page
 shows both bankrolls, record, ROI, CLV, every bet and every parlay.
 
 Things to keep an eye on:
@@ -236,9 +250,12 @@ takes ~5.3 h with both downloads running.
 python -m nhlmodel.report serve        # builds site/index.html, serves http://127.0.0.1:8000/
 ```
 
-`site/index.html` is self-contained, so it can also be opened directly without the server. It plays like a
-game menu: arrow keys / Enter / Esc (or mouse and touch). Areas without real results stay locked
-and open themselves once those results exist. The text is written for readers without a statistics background. Settings has team color themes for all 32 NHL teams (they recolor the page, not the charts), light/dark, and an effects switch.
+`site/index.html` is self-contained, so it can also be opened directly without the server. Sections:
+Overview (with a What's new list), Upcoming (each game opens a page explaining its prediction), Paper bets,
+Models and Game log; on
+a phone they sit in a bottom tab bar. The text is written for readers without a statistics background.
+Settings has light/dark/auto, full or reduced motion, and team accent colors for all 32 NHL teams. To change
+the page itself, edit `web/` and rebuild (see Front end above).
 
 **Skip the download:** processed tables live on the `data` branch:
 
@@ -251,7 +268,7 @@ python -m nhlmodel.features.build      # features.parquet + labels.parquet are n
 ## Layout
 
 ```
-configs/            YAML configs (data.yaml; experiment configs to follow)
+configs/            YAML configs (data.yaml, paper.yaml, experiment configs)
 data/raw/           immutable response cache + manifest.jsonl (gitignored)
 data/processed/     derived tables, rebuildable from data/raw (gitignored)
 src/nhlmodel/
@@ -259,7 +276,11 @@ src/nhlmodel/
   odds/             odds schema/loader, moneyline and vig math, NHL partner-book prices
   paper.py          paper trading: bets rebuilt from the predictions and odds logs, graded
   ratings/          5v5 stints and RAPM player ratings
-  features/ xg/ models/ eval/ backtest/   (upcoming phases)
+  report/           site payload builder; template.html is the built web/ app
+  features/ xg/ models/ eval/ backtest/   features (incl. Elo, form), xG model, model families, evaluation
+  live.py watch.py predict.py             live run, lineup watcher, predictions
+web/                React front end (Vite, Tailwind, motion, bklit-ui charts)
+.claude/skills/     repo skills for Claude sessions (ponytail, apple-design, emil-design-eng)
 tests/              unit tests (leakage, vig math, calibration, ...)
 results/            experiment log
 docs/               findings and design notes
@@ -298,7 +319,8 @@ docs/               findings and design notes
   in-season EDGE features can't be built without leakage. Only prior-season aggregates are used.
 - Confirmed-starter timing and injuries have no historical as-of source, so both are
   leakage risks; see the goalie variants above.
-- No market benchmark yet: without odds we can't say whether the model beats the closing line,
-  the question that matters most for betting.
+- No historical market benchmark: without past odds we can't say whether the model beat the closing line,
+  the question that matters most for betting. Paper trading measures it going forward, but that sample is
+  still small.
 - Backtests over a few seasons are noisy and may not generalize. A backtested edge is not
   a monetizable one: sportsbooks limit or close consistently winning accounts.
