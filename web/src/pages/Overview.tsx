@@ -54,7 +54,7 @@ export function Overview({ D }: { D: Payload }) {
           <Bullets items={[
             "Hockey is close to a coin flip. Even good models rarely pick much more than 60% of winners.",
             "We grade the stated chances, not just the picks: games given a 70% chance should be won about 7 times in 10.",
-            "Shot quality is what matters most. Knowing which players are in the lineup helps a little more.",
+            "Shot quality is what matters most. Knowing which players are in the lineup, and how good each one is, helps a little more, and so does each team's recent results.",
             "Still unknown: whether this beats the betting odds. Paper bets track it live, and nothing here is betting advice.",
           ]} />
         </Card>
@@ -70,6 +70,16 @@ export function Overview({ D }: { D: Payload }) {
         </Card>
       </div>
 
+      <Card title="What's new" note="Recent changes to the model and the site.">
+        <ol className="m-0 flex list-none flex-col p-0">
+          {NEWS.map(([d, t]) => (
+            <li key={d + t} className="flex gap-4 border-b border-line py-2.5 text-[0.9375rem] last:border-0">
+              <span className="num w-14 shrink-0 text-muted">{d}</span><span className="text-ink-2">{t}</span>
+            </li>
+          ))}
+        </ol>
+      </Card>
+
       <div className="grid gap-6 md:grid-cols-2">
         <Card title="Words used on this site">
           <Gloss items={[
@@ -77,6 +87,9 @@ export function Overview({ D }: { D: Payload }) {
             ["Expected goals (xG)", "The chance a shot goes in, judged from where and how it was taken."],
             ["Test seasons", "2018-19 to 2025-26. Models are finalized before these results are looked at, so they work like an exam."],
             ["Development seasons", "2012-13 to 2017-18, used to build and tune models."],
+            ["Player ratings", "How much each player helps his team's chances and limits the other team's, after accounting for who he plays with and against."],
+            ["Elo rating", "A running team score that goes up after wins and down after losses, by more when the result was a surprise or the margin was big."],
+            ["Paper bets", "Pretend bets on the real odds, placed only when the model's chance beats the odds' chance by 3+ points. No money is involved."],
             ["95% range", "Where a model's true score likely falls, given the luck in a few thousand games."],
             ["Upper bound", "A test that uses information only certain at puck drop (like the real starting goalie). It shows the most we could gain, not a usable model."],
           ]} />
@@ -96,6 +109,18 @@ export function Overview({ D }: { D: Payload }) {
     </Page>
   );
 }
+
+/** Newest first. Plain words: this is the reader-facing changelog. */
+const NEWS: [string, string][] = [
+  ["Oct 24", "New look: the whole site was rebuilt with a cleaner design, smoother transitions, new charts and a tab bar on phones."],
+  ["Oct 24", "The model now also uses each team's Elo rating, built from its wins, losses and goal margins. It was the biggest single improvement since lineups."],
+  ["Oct 22", "Paper bets now stake more when the edge is bigger (1, 2 or 3 units), and a small daily parlay joins the strongest picks."],
+  ["Oct 22", "Tested whether players or goalies on a hot streak win more. Streaks barely carry over, so the model ignores them."],
+  ["Oct 21", "Paper trading started: pretend bets against real moneyline odds, tracked on the Paper bets page."],
+  ["Oct 21", "Player ratings added: each player's effect on shot quality for and against, adjusted for teammates and opponents."],
+  ["Oct 21", "Predictions update the minute a team posts its lineup, instead of at fixed times."],
+  ["Oct 20", "Each upcoming game opens a page showing what pushes the prediction toward either team."],
+];
 
 /** Live model vs always-home, season by season, from the graded game rows. */
 function SeasonChart({ D }: { D: Payload }) {
