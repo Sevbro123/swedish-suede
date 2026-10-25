@@ -294,7 +294,7 @@ def paper(cfg) -> dict | None:
              "team": r.home if r.side == "home" else r.away, "price": int(r.price), "book": r.book,
              "p": num(r.p_home if r.side == "home" else 1 - r.p_home),
              "p_mkt": num(r.p_mkt_home if r.side == "home" else 1 - r.p_mkt_home), "edge": num(r.edge),
-             "stake": num(r.stake, 2),
+             "stake": num(r.stake, 2), "unit": num(getattr(r, "unit", 1.0), 2),
              "close": None if pd.isna(r.close_home_ml) else int(r.close_home_ml if r.side == "home" else r.close_away_ml),
              "clv": num(r.clv), "lineup": r.lineup, "status": r.status, "profit": num(r.profit, 2)}
             for r in placed.itertuples()]
@@ -302,7 +302,7 @@ def paper(cfg) -> dict | None:
               "stake": num(r.stake, 2), "status": r.status, "profit": num(r.profit, 2)} for r in parlays.iloc[::-1].itertuples()]
     first = str(bets["start_utc"].min())[:10]
     return {"summary": summary(bets, parlays, rules),
-            "rules": {k: rules[k] for k in ("bankroll", "min_edge", "stake_tiers", "flat_stake", "parlay")},
+            "rules": {k: rules[k] for k in ("bankroll", "goal", "sizing", "min_edge", "stake_tiers", "flat_stake", "parlay")},
             "since": first, "books": sorted(set(bets["book"].dropna())), "bets": rows, "parlays": prows}
 
 

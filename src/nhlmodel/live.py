@@ -74,7 +74,7 @@ def record_odds(cfg, client, now: pd.Timestamp) -> int:
 def paper_trade(proc, log: pd.DataFrame, now: pd.Timestamp) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Rebuild the paper bets from the predictions and odds logs and update the parlays (``nhlmodel.paper``).
     Returns (bets, parlay legs)."""
-    from .paper import BET_COLS, LEG_COLS, build_bets, update_parlays
+    from .paper import BET_COLS, LEG_COLS, build_bets, grade_parlays, update_parlays
 
     lp, op = proc / "paper_parlays.csv", proc / "odds_log.csv"
     legs = pd.read_csv(lp) if lp.exists() else pd.DataFrame(columns=LEG_COLS)
@@ -83,7 +83,7 @@ def paper_trade(proc, log: pd.DataFrame, now: pd.Timestamp) -> tuple[pd.DataFram
     games = pd.concat([pd.read_parquet(proc / "games.parquet"), pd.read_parquet(proc / "upcoming.parquet")])
     games = games.drop_duplicates("game_id")[["game_id", "start_time_utc", "local_date", "away_abbrev", "home_abbrev", "home_win"]]
     cfg = load_config("configs/paper.yaml")
-    bets = build_bets(log, pd.read_csv(op), games, cfg, now)
+    bets = build_bets(log, pd.read_csv(op), games, cfg, now, grade_parlays(legs, games, now))
     return bets, update_parlays(legs, bets, cfg, now)
 
 

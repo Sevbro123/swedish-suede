@@ -1,5 +1,6 @@
 # Paper trading: the bets the live model would make at the NHL partner book's moneylines (nhlmodel.paper).
-bankroll: 100        # starting bankroll, in units (nominal: only the profit curve is shown)
+bankroll: 100        # starting bankroll, in units
+goal: 10000          # target bankroll (shown on the site as progress in doublings: 100 -> 10,000 is ~6.6)
 min_edge: 0.03       # bet a side only when the model's win chance beats the book's no-vig chance by this much;
                      # anything closer is a toss-up and gets no bet
 devig: multiplicative
@@ -12,9 +13,19 @@ stake_tiers:
   - [0.08, 3]
 flat_stake: 1
 
+# Bet sizing as the bankroll grows. The tiers above are in units; one unit is worth unit_pct of the bankroll
+# at the start of the bet's day, rounded down to step, never below min_unit (so nothing changes until the
+# bankroll passes 125u). 1% per unit is about a fifth to a quarter of what full Kelly would stake at a typical 3-5 point
+# edge (less on favourites), so a bad run dents the bankroll rather than ending it. Stakes shrink again after losses.
+sizing:
+  unit_pct: 0.01
+  step: 0.25
+  min_unit: 1
+  max_bet_pct: 0.04   # cap on any single bet, as a share of the bankroll (binds only after a drawdown below 75u)
+
 # Parlay: when 2+ games on the same day clear parlay.min_edge, also bet the strongest (up to max_legs) together.
 # It can change until its first game starts, then it's locked.
 parlay:
   min_edge: 0.05
   max_legs: 3
-  stake: 0.5
+  stake: 0.5          # units, so it grows with the unit size too

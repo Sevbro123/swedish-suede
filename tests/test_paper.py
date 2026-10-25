@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from nhlmodel.odds.partner import ODDS_COLS, append_log, parse, to_american
-from nhlmodel.paper import LEG_COLS, build_bets, grade_parlays, stake_for, summary, update_parlays
+from nhlmodel.paper import LEG_COLS, build_bets, grade_parlays, stake_for, summary, unit_size, update_parlays
 
 CFG = {"bankroll": 100, "min_edge": 0.03, "devig": "multiplicative", "max_price_age_min": 30,
        "stake_tiers": [[0.03, 1], [0.05, 2], [0.08, 3]], "flat_stake": 1,
@@ -123,3 +123,44 @@ def test_grade_parlay():
     assert lost["status"] == "lost" and lost["profit"] == -0.5
     wait = grade_parlays(legs, pd.DataFrame({"game_id": [1, 2], "home_win": [1, np.nan]}), T).iloc[0]
     assert wait["status"] == "pending" and np.isnan(wait["profit"])
+
+
+SIZED = {**CFG, "goal": 10000, "sizing": {"unit_pct": 0.01, "step": 0.25, "min_unit": 1, "max_bet_pct": 0.04}}
+
+
+def test_unit_size_grows_with_bankroll_and_never_drops_below_one():
+    assert unit_size(100, CFG) == 1
+    assert [unit_size(b, SIZED) for b in (50, 100, 124.9, 125, 260, 10000)] == [1, 1, 1, 1.25, 2.5, 100]
+
+
+def test_stakes_size_from_the_previous_days_bankroll():
+    t1, t2 = T, T + pd.Timedelta(days=1)
+    log = pd.DataFrame({"game_id": [1, 2], "made_at": [(t1 - pd.Timedelta(minutes=10)).isoformat(),
+                                                       (t2 - pd.Timedelta(minutes=10)).isoformat()],
+                        "p_home": [0.95, 0.95], "lineup": ["x"] * 2})
+    odds = _odds([(1, t1 - pd.Timedelta(minutes=10), 2000, -5000), (2, t2 - pd.Timedelta(minutes=10), -110, -110)])
+    games = pd.DataFrame({"game_id": [1, 2], "start_time_utc": [t1, t2], "local_date": [t1.date(), t2.date()],
+                          "away_abbrev": ["A", "B"], "home_abbrev": ["H", "I"], "home_win": [1.0, 1.0]})
+    bets = build_bets(log, odds, games, SIZED, t2 + pd.Timedelta(hours=4)).set_index("game_id")
+    # day 1: 3u at +2000 wins 60u -> day 2 starts at 160u, so one unit is 1.5u and the 3-unit bet stakes 4.5u
+    assert bets.loc[1, "stake"] == 3 and bets.loc[1, "profit"] == pytest.approx(60)
+    assert bets.loc[2, "unit"] == 1.5 and bets.loc[2, "stake"] == 4.5
+    assert bets.loc[2, "profit_flat"] == pytest.approx(100 / 110)   # benchmark stays 1u
+    # a parlay that lost 20u on day 1 counts too: 140u -> 1.25u units
+    lost = pd.DataFrame({"date": [str(t1.date())], "status": ["lost"], "profit": [-20.0]})
+    assert build_bets(log, odds, games, SIZED, t2, lost).set_index("game_id").loc[2, "unit"] == 1.25
+    s = summary(bets.reset_index(), grade_parlays(pd.DataFrame(columns=LEG_COLS), games, T), SIZED)
+    assert s["unit"] == unit_size(s["bankroll"], SIZED) and s["doublings_needed"] == pytest.approx(6.644, abs=1e-3)
+
+
+def test_bet_cap_after_a_drawdown():
+    made = T - pd.Timedelta(minutes=10)
+    log = pd.DataFrame({"game_id": [1], "made_at": [made.isoformat()], "p_home": [0.9], "lineup": ["x"]})
+    cfg = {**SIZED, "bankroll": 50}
+    bets = build_bets(log, _odds([(1, made, -110, -110)]), _games([np.nan] * 3), cfg, made)
+    assert bets.loc[0, "stake"] == 2   # 3 units, capped at 4% of 50u
+
+
+def test_parlay_stake_scales_with_unit():
+    legs = update_parlays(pd.DataFrame(columns=LEG_COLS), _open_bets([0.06, 0.07]).assign(unit=2.0), CFG, T - pd.Timedelta(hours=1))
+    assert (legs["stake"] == 1.0).all()
