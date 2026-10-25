@@ -106,6 +106,7 @@ const span8 = "col-span-12 xl:col-span-8", span4 = "col-span-12 md:col-span-6 xl
 
 /** Newest first. Plain words: this is the reader-facing changelog. */
 const NEWS: [string, string][] = [
+  ["Oct 25", "Paper bets now aim to grow the bankroll from 100 to 10,000 units: bet sizes rise slowly as the bankroll grows (one unit is 1% of it) and shrink after losses. A goal tracker shows progress."],
   ["Oct 24", "App-style redesign: full-width screens, a game-menu sidebar with keyboard controls, more depth, and team colors that recolor everything including win bars and charts."],
   ["Oct 24", "New look: the whole site was rebuilt with a cleaner design, smoother transitions, new charts and a tab bar on phones."],
   ["Oct 24", "The model now also uses each team's Elo rating, built from its wins, losses and goal margins. It was the biggest single improvement since lineups."],

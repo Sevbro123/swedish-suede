@@ -6,8 +6,12 @@ run and the rules can't drift from what was known at the time:
 - the bet: each game's last prediction before puck drop (predictions_log.csv), at the price read in the
   same run (the newest odds-log row at most ``max_price_age_min`` before the prediction). It bets the side
   whose model chance beats the book's no-vig chance by ``min_edge`` or more (closer is a toss-up: no bet).
-  The stake grows with the edge (``stake_tiers``); ``profit_flat`` is the same bet at ``flat_stake`` units,
+  The edge sets how many units (``stake_tiers``); ``profit_flat`` is the same bet at ``flat_stake`` units,
   the original flat strategy kept as a benchmark.
+- sizing: one unit is worth 1u until the bankroll grows, then ``sizing.unit_pct`` of the bankroll at the start
+  of the bet's day (settled bets and parlays from earlier days), rounded down to ``sizing.step``, never below
+  ``sizing.min_unit``. No bet risks more than ``sizing.max_bet_pct`` of that bankroll. So stakes grow with the
+  bankroll toward the ``goal`` and shrink back after a losing run, but only once a day.
 - parlays: when 2+ games on one day clear ``parlay.min_edge``, the strongest (up to ``max_legs``) are also bet
   together. Unlike single bets, a parlay must be settled on before its first game starts, while later games'
   final predictions don't exist yet, so it is kept as state (paper_parlays.csv, one row per leg): each run
@@ -26,7 +30,7 @@ import pandas as pd
 from .odds.vig import american_to_decimal, devig
 
 BET_COLS = ["game_id", "date", "start_utc", "away", "home", "made_at", "lineup", "p_home", "home_ml", "away_ml",
-            "book", "p_mkt_home", "edge_home", "side", "edge", "price", "stake", "close_home_ml", "close_away_ml",
+            "book", "p_mkt_home", "edge_home", "side", "edge", "price", "unit", "stake", "close_home_ml", "close_away_ml",
             "clv", "status", "profit", "profit_flat"]
 LEG_COLS = ["date", "game_id", "start_utc", "away", "home", "side", "price", "p", "p_mkt", "made_at", "stake"]
 
@@ -40,6 +44,37 @@ def stake_for(edge, tiers) -> np.ndarray:
     return out
 
 
+def unit_size(bankroll, cfg) -> float:
+    """What one unit is worth at this bankroll (``sizing`` in configs/paper.yaml; 1 without it)."""
+    sz = cfg.get("sizing")
+    if not sz:
+        return 1.0
+    step = float(sz["step"])
+    return max(float(sz["min_unit"]), np.floor(float(sz["unit_pct"]) * bankroll / step + 1e-9) * step)
+
+
+def _size_by_day(out: pd.DataFrame, unit_profit: np.ndarray, parlays: pd.DataFrame | None, cfg: dict) -> None:
+    """Fill ``unit``, ``stake`` and ``profit`` day by day: each day's unit comes from the bankroll after every
+    earlier day's settled bets and parlays (in place)."""
+    b0, sz = float(cfg["bankroll"]), cfg.get("sizing") or {}
+    pp = pd.Series(dtype=float)
+    if parlays is not None and len(parlays):
+        pp = parlays.assign(date=parlays["date"].astype(str)).groupby("date")["profit"].sum(min_count=1).dropna()
+    tiers = out["stake"].to_numpy(float)
+    unit, stake = np.ones(len(out)), tiers.copy()
+    singles = 0.0
+    for d in sorted(out["date"].unique()):
+        m = (out["date"] == d).to_numpy()
+        bank = b0 + singles + (float(pp[pp.index < d].sum()) if len(pp) else 0.0)
+        unit[m] = unit_size(bank, cfg)
+        stake[m] = tiers[m] * unit[m]
+        if "max_bet_pct" in sz:
+            stake[m] = np.minimum(stake[m], max(float(sz["min_unit"]), float(sz["max_bet_pct"]) * bank))
+        singles += float(np.nansum(stake[m] * unit_profit[m]))
+    out["unit"], out["stake"] = unit, np.round(stake, 2)
+    out["profit"] = out["stake"] * unit_profit
+
+
 def _latest_before(odds: pd.DataFrame, cutoff: pd.Series) -> pd.DataFrame:
     """For each row of ``cutoff`` (indexed by game_id), the newest odds row observed strictly before it."""
     o = odds.merge(cutoff.rename("cutoff"), left_on="game_id", right_index=True)
@@ -47,9 +82,11 @@ def _latest_before(odds: pd.DataFrame, cutoff: pd.Series) -> pd.DataFrame:
     return o.sort_values("observed_at").groupby("game_id").tail(1).set_index("game_id")
 
 
-def build_bets(log: pd.DataFrame, odds: pd.DataFrame, games: pd.DataFrame, cfg: dict, now: pd.Timestamp) -> pd.DataFrame:
+def build_bets(log: pd.DataFrame, odds: pd.DataFrame, games: pd.DataFrame, cfg: dict, now: pd.Timestamp,
+               parlays: pd.DataFrame | None = None) -> pd.DataFrame:
     """``log``: predictions log (game_id, made_at, p_home, lineup). ``odds``: odds log. ``games``: game_id,
-    start_time_utc, local_date, away_abbrev, home_abbrev and home_win (NaN until final), for every logged game."""
+    start_time_utc, local_date, away_abbrev, home_abbrev and home_win (NaN until final), for every logged game.
+    ``parlays``: graded parlays (``grade_parlays``), whose results count toward the bankroll that sizes bets."""
     if log.empty or odds.empty:
         return pd.DataFrame(columns=BET_COLS)
     odds = odds.assign(observed_at=pd.to_datetime(odds["observed_at"], utc=True))
@@ -96,7 +133,7 @@ def build_bets(log: pd.DataFrame, odds: pd.DataFrame, games: pd.DataFrame, cfg: 
                                                     np.where(started, "pending", "open")))
     dec = american_to_decimal(np.where(bet, out["price"], 100))
     unit = np.where(out["status"] == "won", dec - 1, np.where(out["status"] == "lost", -1.0, np.nan))
-    out["profit"] = out["stake"] * unit
+    _size_by_day(out, unit, parlays, cfg)
     out["profit_flat"] = np.where(bet, float(cfg["flat_stake"]), 0.0) * unit
     out = out.reset_index()
     for c in ("start_utc", "made_at"):
@@ -105,7 +142,8 @@ def build_bets(log: pd.DataFrame, odds: pd.DataFrame, games: pd.DataFrame, cfg: 
 
 
 def update_parlays(legs: pd.DataFrame, bets: pd.DataFrame, cfg: dict, now: pd.Timestamp) -> pd.DataFrame:
-    """Re-pick each day's parlay from the open bets, except days whose parlay already has a leg under way."""
+    """Re-pick each day's parlay from the open bets, except days whose parlay already has a leg under way.
+    The stake is ``parlay.stake`` units at that day's unit size (``bets["unit"]``)."""
     pc = cfg["parlay"]
     legs = legs.copy()
     started = pd.to_datetime(legs["start_utc"], utc=True) <= now
@@ -123,7 +161,7 @@ def update_parlays(legs: pd.DataFrame, bets: pd.DataFrame, cfg: dict, now: pd.Ti
             "home": top["home"], "side": top["side"], "price": top["price"].astype(int),
             "p": np.where(home, top["p_home"], 1 - top["p_home"]),
             "p_mkt": np.where(home, top["p_mkt_home"], 1 - top["p_mkt_home"]),
-            "made_at": top["made_at"], "stake": float(pc["stake"])}))
+            "made_at": top["made_at"], "stake": round(float(pc["stake"]) * float(top["unit"].iloc[0]) if "unit" in top else float(pc["stake"]), 2)}))
     out = pd.concat([keep, *new], ignore_index=True) if new else keep
     return out[LEG_COLS].sort_values(["date", "start_utc", "game_id"]).reset_index(drop=True)
 
@@ -170,6 +208,8 @@ def summary(bets: pd.DataFrame, parlays: pd.DataFrame, cfg: dict) -> dict:
                     pdone.assign(t=pdone["last_start"], profit_flat=0.0)[["t", "profit", "profit_flat"]] if len(pdone) else None])
     ev = ev.sort_values("t", kind="stable") if len(ev) else ev
     b0 = float(cfg["bankroll"])
+    bank = b0 + profit
+    goal = cfg.get("goal")
     return {
         "games_priced": int(len(bets)), "bets": int(len(placed)), "settled": int(len(done)),
         "won": int((done["status"] == "won").sum()), "lost": int((done["status"] == "lost").sum()),
@@ -177,7 +217,10 @@ def summary(bets: pd.DataFrame, parlays: pd.DataFrame, cfg: dict) -> dict:
         "parlays": int(len(parlays)), "parlays_won": int((parlays["status"] == "won").sum()) if len(parlays) else 0,
         "parlays_settled": int(len(pdone)),
         "staked": round(staked, 2), "profit": round(profit, 2), "roi": round(profit / staked, 4) if staked else None,
-        "bankroll_start": b0, "bankroll": round(b0 + profit, 2),
+        "bankroll_start": b0, "bankroll": round(bank, 2), "unit": unit_size(bank, cfg),
+        # progress toward the goal in doublings, since the bankroll compounds: 100 -> 200 is as far as 5,000 -> 10,000
+        "goal": goal, "doublings": round(float(np.log2(max(bank, 1e-9) / b0)), 3),
+        "doublings_needed": round(float(np.log2(goal / b0)), 3) if goal else None,
         "flat": {"staked": round(flat_staked, 2), "profit": round(flat_profit, 2), "bankroll": round(b0 + flat_profit, 2),
                  "roi": round(flat_profit / flat_staked, 4) if flat_staked else None},
         "avg_edge": round(float(placed["edge"].mean()), 4) if len(placed) else None,

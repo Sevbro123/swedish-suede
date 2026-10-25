@@ -131,7 +131,10 @@ betting partner's current 2-way moneylines (`/v1/partner-game/US/now`, no key ne
 (so it is readable at the site's URL). `nhlmodel.paper` rebuilds the bets from the two logs every run: each
 game's last prediction before puck drop, at the price read in that same run, bets a side whose model
 chance beats the no-vig price by 3+ points (closer is a toss-up: no bet). The stake grows with the edge
-(1u at 3-5 points, 2u at 5-8, 3u at 8+), and a flat 1u version of the same bets is kept as a benchmark.
+(1 unit at 3-5 points, 2 at 5-8, 3 at 8+), and a flat 1u version of the same bets is kept as a benchmark.
+Goal: grow the 100u bankroll to 10,000u. Each day one unit is worth 1% of the bankroll after earlier days'
+settled bets and parlays (rounded down to 0.25u, never below 1u; no bet over 4% of the bankroll), roughly a
+fifth to a quarter of full Kelly, so stakes rise past 1u as the bankroll grows and shrink after losses.
 When 2+ games on a day clear 5 points, the strongest (up to 3) also go into a 0.5u parlay, kept in
 `paper_parlays.csv` (carried on the `site` branch) and locked once its first game starts. The last price
 before puck drop is the close (for CLV). Rules are in `configs/paper.yaml`; the site's Paper bets page

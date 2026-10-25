@@ -1,8 +1,9 @@
 import { curveStepAfter } from "@visx/curve";
 import { ChartTooltip, Grid, Line, LineChart, XAxis, YAxis } from "../charts";
+import { motion, useReducedMotion } from "motion/react";
 import { useMemo } from "react";
 import { day, ml, pct, signed, type Paper, type Payload } from "../data";
-import { Chip, Empty, Gloss, Legend, Note, Panel, Screen, Stat } from "../ui";
+import { Chip, Empty, Gloss, Legend, Note, Panel, Screen, SPRING, Stat } from "../ui";
 
 const RES: Record<string, [string, "good" | "bad" | undefined]> = { won: ["Won", "good"], lost: ["Lost", "bad"], open: ["Not started", undefined], pending: ["Waiting", undefined] };
 const pts = (v: number | null) => { if (v == null) return "-"; const r = Math.round(1000 * v) / 10; return `${r > 0 ? "+" : ""}${(r || 0).toFixed(1)} pts`; };
@@ -11,7 +12,7 @@ export function PaperPage({ D }: { D: Payload }) {
   const P = D.paper;
   if (!P) return <Screen index="03" kicker="Paper bets" title="Paper bets"><Empty title="Paper bets" need="betting prices recorded before a game (each live run reads them)." /></Screen>;
   const S = P.summary, R = P.rules;
-  const tiers = R.stake_tiers.map(([e, u], i) => { const nx = R.stake_tiers[i + 1]; return `${u}u at ${(100 * e).toFixed(0)}${nx ? `-${(100 * nx[0]).toFixed(0)}` : "+"} points`; }).join(", ");
+  const tiers = R.stake_tiers.map(([e, u], i) => { const nx = R.stake_tiers[i + 1]; return `${R.sizing ? `${u} unit${u > 1 ? "s" : ""}` : `${u}u`} at ${(100 * e).toFixed(0)}${nx ? `-${(100 * nx[0]).toFixed(0)}` : "+"} points`; }).join(", ");
   return (
     <Screen index="03" kicker="Paper bets" title="Paper bets"
       aside={<Note className="max-w-[34ch]">For tracking the model only. Nothing here is betting advice.</Note>}
@@ -53,17 +54,44 @@ export function PaperPage({ D }: { D: Payload }) {
           ) : <Note>No day has had two {(100 * R.parlay.min_edge).toFixed(0)}+ point picks yet.</Note>}
         </Panel>
       </div>
-      <Panel className="col-span-12 xl:col-span-4 xl:self-start" title="The rules">
+      <div className="col-span-12 flex flex-col gap-4 xl:col-span-4 xl:self-start lg:gap-5">
+      <Goal P={P} />
+      <Panel title="The rules">
         <Gloss stacked items={[
           ["Stake", <>The bigger the gap, the bigger the bet: {tiers}. A flat {R.flat_stake}u on every bet is tracked too, as a benchmark ({S.flat.bankroll.toFixed(2)}u now, {S.flat.roi == null ? "-" : pct(S.flat.roi)} return).</>],
           ["Parlay", <>When {(100 * R.parlay.min_edge).toFixed(0)}+ point picks line up on the same day, the strongest {R.parlay.max_legs > 2 ? "two or three" : "two"} also go into a {R.parlay.stake}u parlay. It pays only if every pick wins; the payout multiplies, but so does the bookmaker's cut, so it is kept small. A parlay is locked when its first game starts.</>],
           ["Edge", <>Our win chance minus the book's, after removing the bookmaker's cut. {S.bets} bets out of {S.games_priced} priced games so far, average edge {pts(S.avg_edge)}.</>],
           ["Closing price", "The last price before puck drop. If the market moved toward our side after we bet, we beat the close. Over a few hundred bets this says more than the win-loss record, which is mostly luck early on."],
           ["Timing", "Each bet is the last one made before puck drop, so it uses the confirmed lineup when it posts in time."],
-          ["Unit", "A fixed bet size. Profit is shown in units, so it reads the same whatever one unit is worth."],
+          ["Unit", R.sizing
+            ? <>Bets grow with the bankroll. Each day one unit is worth {(100 * R.sizing.unit_pct).toFixed(0)}% of the bankroll at the start of that day (never less than {R.sizing.min_unit}u), so a 2-unit bet at 300u stakes 6u. That is a fifth to a quarter of what the Kelly formula would bet, so a bad run dents the bankroll instead of ending it, and stakes shrink again after losses.{R.sizing.max_bet_pct ? ` No single bet risks more than ${(100 * R.sizing.max_bet_pct).toFixed(0)}% of the bankroll.` : ""}</>
+            : "A fixed bet size. Profit is shown in units, so it reads the same whatever one unit is worth."],
         ]} />
       </Panel>
+      </div>
     </Screen>
+  );
+}
+
+/** Progress to the bankroll goal, in doublings: the bankroll compounds, so 100 to 200 is as far as 5,000 to 10,000. */
+function Goal({ P }: { P: Paper }) {
+  const S = P.summary, sz = P.rules.sizing, reduce = useReducedMotion();
+  if (!S.goal || !S.doublings_needed || S.doublings == null) return null;
+  const f = Math.min(1, Math.max(0, S.doublings / S.doublings_needed));
+  const marks = Array.from({ length: Math.floor(S.doublings_needed) }, (_, i) => (i + 1) / S.doublings_needed!);
+  const unit = S.unit ?? 1, next = sz ? (unit + sz.step) / sz.unit_pct : null;
+  return (
+    <Panel title="Goal" note={`${S.goal.toLocaleString()}u, from ${S.bankroll_start}u`}>
+      <div className="num text-[1.5rem] font-semibold tracking-[-0.02em]">{S.bankroll.toLocaleString(undefined, { maximumFractionDigits: 2 })}u</div>
+      <div className="relative mt-3 h-2.5 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(100 * f)}>
+        <motion.div className="h-full origin-left rounded-full bg-accent" initial={reduce ? false : { scaleX: 0 }} animate={{ scaleX: f }} transition={SPRING} />
+        {marks.map((m) => <i key={m} aria-hidden className="absolute top-0 h-full w-px" style={{ left: `${100 * m}%`, background: "var(--line-strong)" }} />)}
+      </div>
+      <Note className="mt-3">
+        {Math.max(0, S.doublings).toFixed(1)} of {S.doublings_needed.toFixed(1)} doublings (each tick is one). One unit is worth {unit}u now
+        {next ? `; it steps up to ${unit + sz!.step}u at ${Math.round(next)}u` : ""}.
+      </Note>
+    </Panel>
   );
 }
 
