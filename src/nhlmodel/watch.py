@@ -1,20 +1,24 @@
 """Stay up through the game window and rerun the live pipeline as soon as a lineup posts.
 
-    python -m nhlmodel.watch [--hours 3] [--horizon 1.5] [--window 25] [--publish scripts/publish_site.sh]
+    python -m nhlmodel.watch [--hours 5.5] [--horizon 12] [--window 25] [--publish scripts/publish_site.sh]
 
 Runs ``nhlmodel.live`` once, then watches the games starting within ``--window`` minutes: it polls their
 play-by-play rosterSpots every minute and, when a team's dressed lineup appears, reruns the pipeline (and the
 publish command) right away. Each polling minute it also reads the partner book's moneylines, so paper
 trading gets a closing price. It stops after ``--hours`` or once no game starts within ``--horizon`` hours.
+When it stops on the clock with games still ahead, it writes ``more=true`` to ``$GITHUB_OUTPUT`` so the
+workflow can dispatch the next run (a chain that doesn't depend on GitHub's cron).
 
 Why a watcher and not fixed run times (seen live on 2026-10-20): dressed lineups land in rosterSpots only
 5-15 minutes before puck drop, sometimes after it, and GitHub starts scheduled runs late or not at all (the
 14:15 UTC run started at 18:27; two of the five evening runs never ran). A run 25-55 minutes before puck drop
-can't see the lineup, and a run needed at a given minute may never come.
+can't see the lineup, and a run needed at a given minute may never come. Through 2026-10-25 only 4-6 of the
+30 daily cron triggers ran at all, so a run now keeps watching up to 12 h ahead and hands off to the next.
 """
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 import time
@@ -54,8 +58,8 @@ def main(argv: list[str] | None = None) -> int:
     from .live import record_odds
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--hours", type=float, default=3, help="stop after this long")
-    ap.add_argument("--horizon", type=float, default=1.5, help="stop once no game starts within this many hours")
+    ap.add_argument("--hours", type=float, default=5.5, help="stop after this long")
+    ap.add_argument("--horizon", type=float, default=12, help="stop once no game starts within this many hours")
     ap.add_argument("--window", type=float, default=25, help="poll lineups of games starting within this many minutes")
     ap.add_argument("--publish", help="command to run after each pipeline run (e.g. scripts/publish_site.sh)")
     args = ap.parse_args(argv)
@@ -84,6 +88,11 @@ def main(argv: list[str] | None = None) -> int:
                 posted |= new
                 continue
         time.sleep(max((min(wake, deadline) - pd.Timestamp.now(tz="UTC")).total_seconds(), 0))
+    up = pd.read_parquet(proc / "upcoming.parquet")
+    more = plan(up, pd.Timestamp.now(tz="UTC"), args.horizon, args.window)[1] is not None
+    if out := os.environ.get("GITHUB_OUTPUT"):
+        with open(out, "a") as f:
+            f.write(f"more={str(more).lower()}\n")
     return 0
 
 
