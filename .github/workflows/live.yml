@@ -2,10 +2,11 @@
 # publish it to the `site` branch (Vercel deploys that branch). Each run is a watcher (`nhlmodel.watch`):
 # it runs the pipeline once, then stays up while games are due, polling the lineups of games about to start
 # every minute and republishing as soon as one posts (dressed lineups appear only 5-15 min before puck drop).
-# A watcher stays up only while a game starts within 90 min, and at most 3 h. GitHub starts scheduled runs
-# late or drops them, so there are triggers every 30 min from 13:07 to 03:37 UTC (each game gets about three
-# chances to start a watcher in time): triggers that arrive while a watcher is running wait as one pending
-# run, which takes over when it stops. That covers matinees and late western games. Times are UTC.
+# A watcher stays up while a game starts within 12 h, for at most 5.5 h; if games are still ahead when it
+# stops, it dispatches the next run itself (workflow_dispatch starts within seconds), so one run carries
+# the whole game day. GitHub's cron is unreliable here (through 2026-10-25 only 4-6 of the 30 daily
+# triggers ran, often 20-50 min late), so the schedule below only has to start the chain once a day; extra
+# triggers that arrive while a watcher is running wait as one pending run. Times are UTC.
 name: live predictions
 
 on:
@@ -20,11 +21,12 @@ concurrency:
 
 permissions:
   contents: write
+  actions: write   # dispatch the next run
 
 jobs:
   live:
     runs-on: ubuntu-latest
-    timeout-minutes: 200
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
 
@@ -61,9 +63,17 @@ jobs:
           restore-keys: nhl-raw-
 
       - name: Update, predict, build, publish; then watch for lineups
+        id: watch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python -m nhlmodel.watch --publish scripts/publish_site.sh
+
+      # Runs started by GITHUB_TOKEN don't trigger workflows, except workflow_dispatch.
+      - name: Hand off to the next run while games are ahead
+        if: steps.watch.outputs.more == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run live.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME"
 
       - uses: actions/cache/save@v4
         if: always()

@@ -36,8 +36,10 @@ python -m nhlmodel.predict                      # P(home win) for each team's ne
 **Hosting.** `.github/workflows/live.yml` runs `python -m nhlmodel.watch` on GitHub Actions: it runs
 `nhlmodel.live` and force-pushes the built page to the `site` branch (`scripts/publish_site.sh`), then stays up
 while games are due, polling the lineups of games starting within 25 minutes every minute and republishing as
-soon as one posts. A run stays up only while a game starts within 90 minutes, and at most 3 h. Triggers come
-every 30 minutes from 13:07 to 03:37 UTC, and ones that arrive while a run is going wait as a single pending run, so late or dropped GitHub schedules don't leave gaps
+soon as one posts. A run stays up while a game starts within 12 h, for at most 5.5 h, and if games are still
+ahead when it stops it dispatches the next run itself, so one start carries the whole game day. GitHub's cron
+runs only a few of its triggers (every 30 minutes from 13:07 to 03:37 UTC), often late, so it just has to
+start the chain once a day; triggers that arrive while a run is going wait as a single pending run
 (`docs/lineup_timing.md`). Vercel deploys
 that branch: import the repo in Vercel (framework preset "Other", no build command), then set
 Settings > Git > Production Branch to `site`. The root `vercel.json` turns off deployments for every other
@@ -119,8 +121,8 @@ Done since the last list: 5v5 player ratings (PR #2), the lineup watcher that re
 3. **EDGE features** (prior-season aggregates only; in-season EDGE can't be built without leakage).
 4. **Betting-odds comparison (Phase 5).** Needs a historical odds source with usable terms. The loader and
    vig math are ready (`src/nhlmodel/odds/`). Going forward, paper trading records prices instead.
-5. **Actions minutes.** The watcher keeps a runner up from about 90 minutes before the first puck drop to the
-   last one (about 4-6 hours on a full night), plus about 3 minutes per idle trigger. Free for a public repo;
+5. **Actions minutes.** The watcher chain keeps a runner up from its first start of the day (up to 12 h before
+   the first puck drop) to the last puck drop, about 6-12 hours a day. Free for a public repo;
    on a private one it would exceed the free tier.
 6. **Watch the extreme predictions.** Historically, games given under 25% were won 28% of the time
    (36 games): slightly overconfident. Check again as the live log grows.
