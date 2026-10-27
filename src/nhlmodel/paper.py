@@ -17,7 +17,11 @@ run and the rules can't drift from what was known at the time:
   final predictions don't exist yet, so it is kept as state (paper_parlays.csv, one row per leg): each run
   re-picks a day's parlay from the open bets until one of its legs starts, then it is locked.
 - the close: the newest price read before puck drop. Closing-line value (CLV) is the bet side's no-vig
-  chance at the close minus at the bet: positive means the market moved toward us.
+  chance at the close minus at the bet: positive means the market moved toward us. The bet is placed late (the
+  lineup-confirmed run, minutes before puck drop) and the partner feed refreshes only every 30 minutes, so the
+  bet and the close are often the same feed snapshot: then CLV is left blank, not 0 (nothing was measured).
+- the open: the first price read for the game. Open CLV is the same move measured from there to the close, on
+  the side we bet: did the market move toward our pick over the day? Blank when open and close are one snapshot.
 - settlement: 2-way moneyline, overtime and shootout included (games.parquet ``home_win``).
 
 Writes paper_bets.csv: one row per game we had a price for, ``side`` empty when there was no bet.
@@ -31,7 +35,7 @@ from .odds.vig import american_to_decimal, devig
 
 BET_COLS = ["game_id", "date", "start_utc", "away", "home", "made_at", "lineup", "p_home", "home_ml", "away_ml",
             "book", "p_mkt_home", "edge_home", "side", "edge", "price", "unit", "stake", "close_home_ml", "close_away_ml",
-            "clv", "status", "profit", "profit_flat"]
+            "clv", "open_home_ml", "open_away_ml", "open_clv", "status", "profit", "profit_flat"]
 LEG_COLS = ["date", "game_id", "start_utc", "away", "home", "side", "price", "p", "p_mkt", "made_at", "stake"]
 
 
@@ -82,6 +86,17 @@ def _latest_before(odds: pd.DataFrame, cutoff: pd.Series) -> pd.DataFrame:
     return o.sort_values("observed_at").groupby("game_id").tail(1).set_index("game_id")
 
 
+def _snapshot(o: pd.DataFrame) -> pd.Series:
+    """Which feed snapshot each odds row came from: the feed's own update stamp, else the time we read it."""
+    upd = o["odds_updated_utc"].fillna("").astype(str) if "odds_updated_utc" in o else pd.Series("", index=o.index)
+    return upd.where(upd != "", o["observed_at"].astype(str))
+
+
+def _side_clv(side: pd.Series, p_from: pd.Series, p_to: pd.Series) -> np.ndarray:
+    """Move in the bet side's no-vig chance from ``p_from`` to ``p_to`` (home chances)."""
+    return np.where(side == "home", p_to - p_from, np.where(side == "away", p_from - p_to, np.nan))
+
+
 def build_bets(log: pd.DataFrame, odds: pd.DataFrame, games: pd.DataFrame, cfg: dict, now: pd.Timestamp,
                parlays: pd.DataFrame | None = None) -> pd.DataFrame:
     """``log``: predictions log (game_id, made_at, p_home, lineup). ``odds``: odds log. ``games``: game_id,
@@ -98,6 +113,8 @@ def build_bets(log: pd.DataFrame, odds: pd.DataFrame, games: pd.DataFrame, cfg: 
     fresh = at_bet["observed_at"] >= g.loc[at_bet.index, "made_at"] - pd.Timedelta(minutes=cfg["max_price_age_min"])
     at_bet = at_bet[fresh]
     close = _latest_before(odds, g["start_time_utc"])
+    o = odds.merge(g["start_time_utc"].rename("cutoff"), left_on="game_id", right_index=True)
+    opening = o[o["observed_at"] < o["cutoff"]].sort_values("observed_at").groupby("game_id").head(1).set_index("game_id")
     g = g.loc[at_bet.index]
     if g.empty:
         return pd.DataFrame(columns=BET_COLS)
@@ -123,8 +140,18 @@ def build_bets(log: pd.DataFrame, odds: pd.DataFrame, games: pd.DataFrame, cfg: 
     if has_close.any():
         c = out[has_close]
         p_close[has_close] = devig(c["close_home_ml"].to_numpy(float), c["close_away_ml"].to_numpy(float), cfg["devig"])
-    out["clv"] = np.where(out["side"] == "home", p_close - out["p_mkt_home"],
-                          np.where(out["side"] == "away", out["p_mkt_home"] - p_close, np.nan))
+    snap_close = _snapshot(close).reindex(out.index)
+    out["clv"] = np.where(_snapshot(at_bet).reindex(out.index) == snap_close, np.nan,
+                          _side_clv(out["side"], out["p_mkt_home"], p_close))
+    out["open_home_ml"] = opening["home_ml"].reindex(out.index)
+    out["open_away_ml"] = opening["away_ml"].reindex(out.index)
+    p_open = pd.Series(np.nan, index=out.index)
+    has_open = out["open_home_ml"].notna()
+    if has_open.any():
+        c = out[has_open]
+        p_open[has_open] = devig(c["open_home_ml"].to_numpy(float), c["open_away_ml"].to_numpy(float), cfg["devig"])
+    out["open_clv"] = np.where(_snapshot(opening).reindex(out.index) == snap_close, np.nan,
+                               _side_clv(out["side"], p_open, p_close))
 
     won = np.where(out["side"] == "home", g["home_win"] == 1, g["home_win"] == 0)
     final = g["home_win"].notna()
@@ -204,6 +231,7 @@ def summary(bets: pd.DataFrame, parlays: pd.DataFrame, cfg: dict) -> dict:
     flat_staked = float(cfg["flat_stake"]) * len(done)
     flat_profit = float(done["profit_flat"].sum())
     clv = placed["clv"].dropna()
+    oclv = placed["open_clv"].dropna() if "open_clv" in placed else pd.Series(dtype=float)
     ev = pd.concat([done.assign(t=done["start_utc"])[["t", "profit", "profit_flat"]],
                     pdone.assign(t=pdone["last_start"], profit_flat=0.0)[["t", "profit", "profit_flat"]] if len(pdone) else None])
     ev = ev.sort_values("t", kind="stable") if len(ev) else ev
@@ -227,6 +255,9 @@ def summary(bets: pd.DataFrame, parlays: pd.DataFrame, cfg: dict) -> dict:
         "avg_stake": round(float(placed["stake"].mean()), 2) if len(placed) else None,
         "avg_clv": round(float(clv.mean()), 4) if len(clv) else None,
         "beat_close": round(float((clv > 0).mean()), 4) if len(clv) else None,
+        "clv_n": int(len(clv)),   # bets whose close is a later feed snapshot than the bet's (CLV measured)
+        "avg_open_clv": round(float(oclv.mean()), 4) if len(oclv) else None,
+        "beat_open": round(float((oclv > 0).mean()), 4) if len(oclv) else None, "open_clv_n": int(len(oclv)),
         "curve": [round(b0 + x, 2) for x in ev["profit"].cumsum()] if len(ev) else [],
         "curve_flat": [round(b0 + x, 2) for x in ev["profit_flat"].cumsum()] if len(ev) else [],
     }

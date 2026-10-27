@@ -68,12 +68,27 @@ def test_bets_use_the_same_runs_price_and_settle():
     assert bets.loc[1, "stake"] == 3 and bets.loc[1, "status"] == "won"
     assert bets.loc[1, "profit"] == pytest.approx(3 * 100 / 150) and bets.loc[1, "profit_flat"] == pytest.approx(100 / 150)
     assert bets.loc[1, "clv"] > 0 and bets.loc[1, "close_home_ml"] == -170
+    # open -110/-110 (0.5) -> close -170/150: the line moved toward our home pick from the first price too
+    assert bets.loc[1, "open_home_ml"] == -110 and bets.loc[1, "open_clv"] > bets.loc[1, "clv"]
+    # games 2 and 3 have one price only: bet, open and close are the same read, so nothing is measured
+    assert np.isnan(bets.loc[2, "clv"]) and np.isnan(bets.loc[2, "open_clv"])
     assert bets.loc[2, "side"] == "away" and bets.loc[2, "status"] == "lost" and bets.loc[2, "profit"] == -3
     assert bets.loc[3, "side"] == "" and bets.loc[3, "status"] == "pass" and bets.loc[3, "stake"] == 0
     s = summary(bets.reset_index(), grade_parlays(pd.DataFrame(columns=LEG_COLS), _games([1.0] * 3), T), CFG)
     assert (s["bets"], s["won"], s["lost"]) == (2, 1, 1)
     assert s["profit"] == pytest.approx(3 * (100 / 150 - 1), abs=0.01)
     assert s["flat"]["profit"] == pytest.approx(100 / 150 - 1, abs=0.01) and len(s["curve"]) == len(s["curve_flat"]) == 2
+
+
+def test_clv_blank_when_bet_and_close_share_a_feed_snapshot():
+    made = T - pd.Timedelta(minutes=10)
+    log = pd.DataFrame({"game_id": [1], "made_at": [made.isoformat()], "p_home": [0.8], "lineup": ["x"]})
+    odds = _odds([(1, made - pd.Timedelta(hours=3), -120, 100), (1, made, -110, -110), (1, T - pd.Timedelta(minutes=1), -110, -110)])
+    odds["odds_updated_utc"] = ["2026-10-22T19:30:38Z", "2026-10-22T22:30:38Z", "2026-10-22T22:30:38Z"]   # re-read of one snapshot
+    b = build_bets(log, odds, _games([1.0] * 3), CFG, T + pd.Timedelta(hours=4)).iloc[0]
+    assert np.isnan(b["clv"]) and b["open_home_ml"] == -120 and b["open_clv"] < 0   # line drifted away from home
+    s = summary(build_bets(log, odds, _games([1.0] * 3), CFG, T + pd.Timedelta(hours=4)), pd.DataFrame(columns=["status"]), CFG)
+    assert s["clv_n"] == 0 and s["avg_clv"] is None and s["open_clv_n"] == 1 and s["beat_open"] == 0
 
 
 def test_no_bet_without_a_fresh_price_or_after_puck_drop():
