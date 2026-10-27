@@ -296,7 +296,7 @@ def paper(cfg) -> dict | None:
              "p_mkt": num(r.p_mkt_home if r.side == "home" else 1 - r.p_mkt_home), "edge": num(r.edge),
              "stake": num(r.stake, 2), "unit": num(getattr(r, "unit", 1.0), 2),
              "close": None if pd.isna(r.close_home_ml) else int(r.close_home_ml if r.side == "home" else r.close_away_ml),
-             "clv": num(r.clv), "lineup": r.lineup, "status": r.status, "profit": num(r.profit, 2)}
+             "clv": num(r.clv), "open_clv": num(getattr(r, "open_clv", None)), "lineup": r.lineup, "status": r.status, "profit": num(r.profit, 2)}
             for r in placed.itertuples()]
     prows = [{"date": r.date, "legs": r.legs, "n_legs": r.n_legs, "decimal": r.decimal, "p": num(r.p), "p_mkt": num(r.p_mkt),
               "stake": num(r.stake, 2), "status": r.status, "profit": num(r.profit, 2)} for r in parlays.iloc[::-1].itertuples()]

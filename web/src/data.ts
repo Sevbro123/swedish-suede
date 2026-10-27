@@ -20,7 +20,7 @@ export interface Live {
 }
 export interface Bet {
   start_utc: string; away: string; home: string; side: string; team: string; price: number; book: string; p: number | null;
-  p_mkt: number | null; edge: number | null; stake: number; unit?: number; close: number | null; clv: number | null; lineup: string; status: string; profit: number | null;
+  p_mkt: number | null; edge: number | null; stake: number; unit?: number; close: number | null; clv: number | null; open_clv?: number | null; lineup: string; status: string; profit: number | null;
 }
 export interface Parlay { date: string; legs: string; n_legs: number; decimal: number; p: number | null; p_mkt: number | null; stake: number; status: string; profit: number | null }
 export interface Paper {
@@ -29,7 +29,7 @@ export interface Paper {
     parlays_settled: number; staked: number; profit: number; roi: number | null; bankroll_start: number; bankroll: number;
     unit?: number; goal?: number | null; doublings?: number; doublings_needed?: number | null;
     flat: { staked: number; profit: number; bankroll: number; roi: number | null }; avg_edge: number | null; avg_clv: number | null;
-    beat_close: number | null; curve: number[]; curve_flat: number[];
+    beat_close: number | null; clv_n?: number; avg_open_clv?: number | null; beat_open?: number | null; open_clv_n?: number; curve: number[]; curve_flat: number[];
   };
   rules: {
     bankroll: number; goal?: number; sizing?: { unit_pct: number; step: number; min_unit: number; max_bet_pct?: number }; min_edge: number; stake_tiers: [number, number][]; flat_stake: number; parlay: { min_edge: number; max_legs: number; stake: number } };

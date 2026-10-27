@@ -21,18 +21,19 @@ export function PaperPage({ D }: { D: Payload }) {
         <Stat tone="accent" k="Bankroll" v={S.bankroll} format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }} s={`units; started at ${S.bankroll_start}u on ${P.since}`} />
         <Stat k="Record" v={`${S.won}-${S.lost}`} s={`${S.settled} settled, ${S.open} waiting; parlays ${S.parlays_won}-${S.parlays_settled - S.parlays_won}`} />
         <Stat k="Return on stakes" v={S.roi} format={{ style: "percent", minimumFractionDigits: 1, signDisplay: "exceptZero" }} s={`${signed(S.profit)}u on ${S.staked}u staked`} />
-        <Stat k="Beat the closing price" v={S.beat_close} format={{ style: "percent", maximumFractionDigits: 0 }} s={`average move ${pts(S.avg_clv)} our way`} />
+        <Stat k="Line moved our way" v={S.beat_open ?? null} format={{ style: "percent", maximumFractionDigits: 0 }}
+          s={`first price to close, average ${pts(S.avg_open_clv ?? null)} (${S.open_clv_n ?? 0} bets); after our bet ${S.clv_n ?? 0} of ${S.bets} saw a newer price`} />
       <div className="col-span-12 flex flex-col gap-4 xl:col-span-8 lg:gap-5">
         <Bankroll P={P} />
         <Panel title="Bets">
           {P.bets.length ? (
             <div className="scroll-x">
               <table className="data">
-                <thead><tr><th>Date</th><th>Game</th><th>Bet</th><th>Price</th><th>Our chance</th><th>Book's chance</th><th>Stake</th><th>Close</th><th>Moved</th><th>Result</th><th>Profit</th></tr></thead>
+                <thead><tr><th>Date</th><th>Game</th><th>Bet</th><th>Price</th><th>Our chance</th><th>Book's chance</th><th>Stake</th><th>Close</th><th>Since bet</th><th>Since open</th><th>Result</th><th>Profit</th></tr></thead>
                 <tbody>{P.bets.map((b, i) => { const r = RES[b.status] ?? [b.status, undefined]; return (
                   <tr key={i}>
                     <td>{day(b.start_utc)}</td><td className="!text-left">{b.away} at {b.home}</td><td className="font-medium">{b.team}</td><td>{ml(b.price)}</td>
-                    <td>{pct(b.p)}</td><td>{pct(b.p_mkt)}</td><td>{b.stake}u</td><td>{b.close == null ? "-" : ml(b.close)}</td><td>{pts(b.clv)}</td>
+                    <td>{pct(b.p)}</td><td>{pct(b.p_mkt)}</td><td>{b.stake}u</td><td>{b.close == null ? "-" : ml(b.close)}</td><td>{pts(b.clv)}</td><td>{pts(b.open_clv ?? null)}</td>
                     <td><Chip tone={r[1]}>{r[0]}</Chip></td><td>{b.profit == null ? "-" : signed(b.profit)}</td>
                   </tr>); })}</tbody>
               </table>
