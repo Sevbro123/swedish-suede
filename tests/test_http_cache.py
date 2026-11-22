@@ -104,3 +104,19 @@ def test_unsafe_cache_keys_rejected(tmp_path, key):
     c, _, _ = make(tmp_path, [])
     with pytest.raises(ValueError):
         c.is_cached(key)
+
+
+def test_goalie_games_pages_and_joins(tmp_path):
+    from nhlmodel.ingest import nhl
+
+    def page(lo, hi, total):
+        return FakeResp(200, json.dumps({"data": [{"gameId": i, "playerId": 1} for i in range(lo, hi)],
+                                         "total": total}).encode())
+
+    c, sess, _ = make(tmp_path, [page(0, 100, 150), page(100, 150, 150)])
+    rows = nhl.goalie_games(c, 20262027, snapshot="t1")
+    assert len(rows) == 150 and len(sess.calls) == 2
+    assert "start=100&limit=100" in sess.calls[1]
+    joined = tmp_path / "snap/t1/nhl_stats/goalie_games/20262027_2.json.gz"
+    assert len(json.loads(gzip.decompress(joined.read_bytes()))["data"]) == 150
+    assert nhl.goalie_games(c, 20262027, snapshot="t1") == rows and len(sess.calls) == 2

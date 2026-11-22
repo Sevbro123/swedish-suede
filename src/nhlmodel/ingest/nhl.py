@@ -16,6 +16,7 @@ from .http import CachedClient
 WEB = "https://api-web.nhle.com/v1"
 STATS = "https://api.nhle.com/stats/rest/en"
 SNAP = "snap"
+PAGE = 100
 
 
 def _key(key: str, snapshot: str | None) -> str:
@@ -56,14 +57,28 @@ def goalie_games(c: CachedClient, season: int, game_type: int = 2, snapshot: str
     Includes gamesStarted (the starter flag), timeOnIce (s), shotsAgainst, saves, goalsAgainst,
     homeRoad. Replaces per-game boxscores for goalie data.
     """
-    url = (
-        f"{STATS}/goalie/summary?isAggregate=false&isGame=true&start=0&limit=-1&sort=gameId"
-        f"&cayenneExp=seasonId={season}%20and%20gameTypeId={game_type}"
-    )
-    data = c.get_json(url, _key(f"nhl_stats/goalie_games/{season}_{game_type}", snapshot))
-    if len(data["data"]) != data["total"]:
-        raise ValueError(f"goalie_games {season}: got {len(data['data'])} of {data['total']} rows")
-    return data["data"]
+    key = _key(f"nhl_stats/goalie_games/{season}_{game_type}", snapshot)
+    if c.is_cached(key):
+        return c.get_json("", key)["data"]
+    # The API caps pages at 100 rows (limit=-1 stopped working Nov 2026), so page through and
+    # store the joined rows under the usual key. Sort on gameId+playerId so pages never overlap.
+    sort = "%5B%7B%22property%22:%22gameId%22%7D,%7B%22property%22:%22playerId%22%7D%5D"
+    rows: list[dict[str, Any]] = []
+    total = None
+    while total is None or len(rows) < total:
+        url = (
+            f"{STATS}/goalie/summary?isAggregate=false&isGame=true&start={len(rows)}&limit={PAGE}&sort={sort}"
+            f"&cayenneExp=seasonId={season}%20and%20gameTypeId={game_type}"
+        )
+        page = c.get_json(url, f"{key}_p{len(rows)}")
+        total = page["total"]
+        if not page["data"]:
+            break
+        rows += page["data"]
+    if len(rows) != total or len({(r["gameId"], r["playerId"]) for r in rows}) != total:
+        raise ValueError(f"goalie_games {season}: got {len(rows)} of {total} rows")
+    c.put_json(key, {"data": rows, "total": total})
+    return rows
 
 
 def shift_chart(c: CachedClient, game_id: int, snapshot: str | None = None) -> dict[str, Any]:
