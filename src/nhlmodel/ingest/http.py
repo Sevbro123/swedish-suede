@@ -98,6 +98,10 @@ class CachedClient:
         self._log(url, body_path, resp.status_code, content)
         return data
 
+    def put_json(self, cache_key: str, data: Any) -> None:
+        """Store data built from other fetches (e.g. joined pages) under ``cache_key``."""
+        self._write_once(self._paths(cache_key)[0], gzip.compress(json.dumps(data).encode(), mtime=0))
+
     def _fetch(self, url: str) -> requests.Response:
         host = urlparse(url).netloc
         for attempt in range(self.max_retries + 1):
