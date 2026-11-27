@@ -32,7 +32,7 @@ export interface Paper {
     beat_close: number | null; clv_n?: number; avg_open_clv?: number | null; beat_open?: number | null; open_clv_n?: number; curve: number[]; curve_flat: number[];
   };
   rules: {
-    bankroll: number; goal?: number; sizing?: { unit_pct: number; step: number; min_unit: number; max_bet_pct?: number }; min_edge: number; stake_tiers: [number, number][]; flat_stake: number; parlay: { min_edge: number; max_legs: number; stake: number } };
+    bankroll: number; goal?: number; sizing?: { unit_pct: number; step: number; min_unit: number; max_bet_pct?: number }; market_weight?: number; min_edge: number; stake_tiers: [number, number][]; flat_stake: number; parlay: { min_edge: number; max_legs: number; stake: number } };
   since: string; books: string[]; bets: Bet[]; parlays: Parlay[];
 }
 /** [date, season, away, home, p_home, home_win, score] */

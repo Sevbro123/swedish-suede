@@ -179,3 +179,21 @@ def test_bet_cap_after_a_drawdown():
 def test_parlay_stake_scales_with_unit():
     legs = update_parlays(pd.DataFrame(columns=LEG_COLS), _open_bets([0.06, 0.07]).assign(unit=2.0), CFG, T - pd.Timedelta(hours=1))
     assert (legs["stake"] == 1.0).all()
+
+
+def test_market_weight_and_earlier_rules_apply_by_date():
+    from nhlmodel.paper import blend, rules_for
+    assert blend(0.6, 0.5, 0)[()] == pytest.approx(0.6) and blend(0.6, 0.5, 1)[()] == pytest.approx(0.5)
+    assert 0.5 < blend(0.6, 0.5, 0.5)[()] < 0.56
+    cfg = {**CFG, "market_weight": 0.5, "stake_tiers": [[0.03, 1]],
+           "earlier": [{"until": "2026-11-27", "market_weight": 0, "stake_tiers": CFG["stake_tiers"]}]}
+    assert rules_for(pd.Series(["2026-11-26", "2026-11-27"]), cfg, "market_weight") == [0, 0.5]
+    made = T - pd.Timedelta(minutes=10)
+    log = pd.DataFrame({"game_id": [1], "made_at": [made.isoformat()], "p_home": [0.60], "lineup": ["confirmed"]})
+    odds = _odds([(1, made - pd.Timedelta(minutes=1), 100, -100)])  # market 50%, model 60%: raw edge 10 pts
+    g = _games([1, np.nan, np.nan]).iloc[:1]
+    old = build_bets(log, odds, g, cfg, T).iloc[0]                    # 2026-10-22: old rules, 3 units
+    assert old["side"] == "home" and old["stake"] == 3
+    new = build_bets(log, odds, g.assign(local_date=pd.Timestamp("2026-12-01").date()), cfg, T).iloc[0]
+    assert new["side"] == "home" and new["stake"] == 1 and new["edge"] == pytest.approx(new["p_bet_home"] - 0.5)
+    assert 0.04 < new["edge"] < 0.06

@@ -17,7 +17,7 @@ export function PaperPage({ D }: { D: Payload }) {
     <Screen index="03" kicker="Paper bets" title="Paper bets"
       aside={<Note className="max-w-[34ch]">For tracking the model only. Nothing here is betting advice.</Note>}
       sub={<>Pretend bets, no real money. Before each game the model's win chance is compared with the betting price from the NHL's betting partner ({P.books.join(", ") || "none yet"}),
-        with the bookmaker's cut taken out. When our chance for a team is at least {(100 * R.min_edge).toFixed(0)} points higher, we bet on that team at that price; anything closer is a toss-up and we sit it out.</>}>
+        with the bookmaker's cut taken out.{R.market_weight ? <> The market has called games better than the model so far, so our chance is first moved {(100 * R.market_weight).toFixed(0)}% of the way toward the market's.</> : null} When our chance for a team is at least {(100 * R.min_edge).toFixed(0)} points higher, we bet on that team at that price; anything closer is a toss-up and we sit it out.</>}>
         <Stat tone="accent" k="Bankroll" v={S.bankroll} format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }} s={`units; started at ${S.bankroll_start}u on ${P.since}`} />
         <Stat k="Record" v={`${S.won}-${S.lost}`} s={`${S.settled} settled, ${S.open} waiting; parlays ${S.parlays_won}-${S.parlays_settled - S.parlays_won}`} />
         <Stat k="Return on stakes" v={S.roi} format={{ style: "percent", minimumFractionDigits: 1, signDisplay: "exceptZero" }} s={`${signed(S.profit)}u on ${S.staked}u staked`} />
@@ -59,7 +59,7 @@ export function PaperPage({ D }: { D: Payload }) {
       <Goal P={P} />
       <Panel title="The rules">
         <Gloss stacked items={[
-          ["Stake", <>The bigger the gap, the bigger the bet: {tiers}. A flat {R.flat_stake}u on every bet is tracked too, as a benchmark ({S.flat.bankroll.toFixed(2)}u now, {S.flat.roi == null ? "-" : pct(S.flat.roi)} return).</>],
+          ["Stake", <>{R.stake_tiers.length > 1 ? <>The bigger the gap, the bigger the bet: {tiers}.</> : <>Every bet is {tiers}, until bigger edges prove they win more often.</>} A flat {R.flat_stake}u on every bet is tracked too, as a benchmark ({S.flat.bankroll.toFixed(2)}u now, {S.flat.roi == null ? "-" : pct(S.flat.roi)} return).</>],
           ["Parlay", <>When {(100 * R.parlay.min_edge).toFixed(0)}+ point picks line up on the same day, the strongest {R.parlay.max_legs > 2 ? "two or three" : "two"} also go into a {R.parlay.stake}u parlay. It pays only if every pick wins; the payout multiplies, but so does the bookmaker's cut, so it is kept small. A parlay is locked when its first game starts.</>],
           ["Edge", <>Our win chance minus the book's, after removing the bookmaker's cut. {S.bets} bets out of {S.games_priced} priced games so far, average edge {pts(S.avg_edge)}.</>],
           ["Closing price", "The last price before puck drop. If the market moved toward our side after we bet, we beat the close. Over a few hundred bets this says more than the win-loss record, which is mostly luck early on."],

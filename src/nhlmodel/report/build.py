@@ -302,7 +302,7 @@ def paper(cfg) -> dict | None:
               "stake": num(r.stake, 2), "status": r.status, "profit": num(r.profit, 2)} for r in parlays.iloc[::-1].itertuples()]
     first = str(bets["start_utc"].min())[:10]
     return {"summary": summary(bets, parlays, rules),
-            "rules": {k: rules[k] for k in ("bankroll", "goal", "sizing", "min_edge", "stake_tiers", "flat_stake", "parlay")},
+            "rules": {k: rules.get(k) for k in ("bankroll", "goal", "sizing", "market_weight", "min_edge", "stake_tiers", "flat_stake", "parlay")},
             "since": first, "books": sorted(set(bets["book"].dropna())), "bets": rows, "parlays": prows}
 
 

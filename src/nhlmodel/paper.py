@@ -4,8 +4,12 @@ Nothing is stored beyond the two logs the live runs already keep, so the bets ar
 run and the rules can't drift from what was known at the time:
 
 - the bet: each game's last prediction before puck drop (predictions_log.csv), at the price read in the
-  same run (the newest odds-log row at most ``max_price_age_min`` before the prediction). It bets the side
-  whose model chance beats the book's no-vig chance by ``min_edge`` or more (closer is a toss-up: no bet).
+  same run (the newest odds-log row at most ``max_price_age_min`` before the prediction). The model chance is
+  first mixed with the book's no-vig chance (``market_weight`` of market, on the log-odds scale), since the
+  market has predicted better than the model so far. It bets the side whose mixed chance beats the book's
+  no-vig chance by ``min_edge`` or more (closer is a toss-up: no bet).
+- rule changes: ``earlier`` lists the rules in force before a date (``until``), so bets already placed keep
+  the rules they were placed under when the logs are rebuilt.
   The edge sets how many units (``stake_tiers``); ``profit_flat`` is the same bet at ``flat_stake`` units,
   the original flat strategy kept as a benchmark.
 - sizing: one unit is worth 1u until the bankroll grows, then ``sizing.unit_pct`` of the bankroll at the start
@@ -34,7 +38,7 @@ import pandas as pd
 from .odds.vig import american_to_decimal, devig
 
 BET_COLS = ["game_id", "date", "start_utc", "away", "home", "made_at", "lineup", "p_home", "home_ml", "away_ml",
-            "book", "p_mkt_home", "edge_home", "side", "edge", "price", "unit", "stake", "close_home_ml", "close_away_ml",
+            "book", "p_mkt_home", "p_bet_home", "edge_home", "side", "edge", "price", "unit", "stake", "close_home_ml", "close_away_ml",
             "clv", "open_home_ml", "open_away_ml", "open_clv", "status", "profit", "profit_flat"]
 LEG_COLS = ["date", "game_id", "start_utc", "away", "home", "side", "price", "p", "p_mkt", "made_at", "stake"]
 
@@ -46,6 +50,19 @@ def stake_for(edge, tiers) -> np.ndarray:
     for lo, units in sorted(tiers):
         out = np.where(edge >= lo - 1e-9, float(units), out)
     return out
+
+
+def rules_for(dates: pd.Series, cfg: dict, key: str) -> list:
+    """The value of rule ``key`` for each date: the first ``earlier`` entry the date falls before, else cfg[key]."""
+    eras = sorted(cfg.get("earlier") or [], key=lambda r: str(r["until"]))
+    return [next((r[key] for r in eras if str(d) < str(r["until"]) and key in r), cfg.get(key)) for d in dates]
+
+
+def blend(p_model, p_mkt, w_mkt) -> np.ndarray:
+    """Mix two home chances on the log-odds scale, ``w_mkt`` of the way toward the market."""
+    lo = lambda p: np.log(np.clip(p, 1e-9, 1 - 1e-9) / (1 - np.clip(p, 1e-9, 1 - 1e-9)))
+    w = np.asarray(w_mkt, float)
+    return 1 / (1 + np.exp(-((1 - w) * lo(np.asarray(p_model, float)) + w * lo(np.asarray(p_mkt, float)))))
 
 
 def unit_size(bankroll, cfg) -> float:
@@ -125,13 +142,16 @@ def build_bets(log: pd.DataFrame, odds: pd.DataFrame, games: pd.DataFrame, cfg: 
         "home_ml": at_bet["home_ml"].astype(int), "away_ml": at_bet["away_ml"].astype(int), "book": at_bet["book"],
     })
     out["p_mkt_home"] = devig(out["home_ml"].to_numpy(), out["away_ml"].to_numpy(), cfg["devig"])
-    out["edge_home"] = out["p_home"] - out["p_mkt_home"]
+    w = np.array([float(x or 0) for x in rules_for(out["date"], cfg, "market_weight")])
+    out["p_bet_home"] = blend(out["p_home"], out["p_mkt_home"], w)
+    out["edge_home"] = out["p_bet_home"] - out["p_mkt_home"]
     e = cfg["min_edge"] - 1e-9
     out["side"] = np.where(out["edge_home"] >= e, "home", np.where(out["edge_home"] <= -e, "away", ""))
     bet = out["side"] != ""
     out["price"] = np.where(out["side"] == "home", out["home_ml"], np.where(out["side"] == "away", out["away_ml"], np.nan))
     out["edge"] = np.where(out["side"] == "home", out["edge_home"], np.where(out["side"] == "away", -out["edge_home"], np.nan))
-    out["stake"] = np.where(bet, stake_for(out["edge"].fillna(0), cfg["stake_tiers"]), 0.0)
+    tiers = rules_for(out["date"], cfg, "stake_tiers")
+    out["stake"] = np.where(bet, [stake_for(e, t).item() for e, t in zip(out["edge"].fillna(0), tiers)], 0.0)
 
     out["close_home_ml"] = close["home_ml"].reindex(out.index)
     out["close_away_ml"] = close["away_ml"].reindex(out.index)

@@ -106,6 +106,11 @@ Where things stand as of 2026-10-24, so work can pick up from here.
   (`NEWS` in `web/src/pages/Overview.tsx`); add a line there when something visible changes.
 - **2026-10-24, PRs #12-13:** repo skills for Claude sessions in `.claude/skills/`: `ponytail`
   (token-saving rules), `apple-design` and `emil-design-eng` (front-end design and animation guidance).
+- **2026-11-27:** paper trading rules after 96 bets (-8.6% flat ROI, market log loss 0.663 vs model 0.666, edge
+  size showed no signal). From 2026-11-27 the model chance is mixed 50/50 with the no-vig market chance
+  (log-odds) before the 3-point edge test, and every bet is 1 unit (tiers off until 300+ bets beat the close).
+  Earlier bets keep their old rules (`earlier` in `configs/paper.yaml`). On the first 198 priced games the new
+  rules would have made 28 bets for -0.7u, vs 96 bets for -8.2u flat (same games, not out of sample).
 
 ## Outstanding items
 
