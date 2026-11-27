@@ -1,17 +1,26 @@
 # Paper trading: the bets the live model would make at the NHL partner book's moneylines (nhlmodel.paper).
 bankroll: 100        # starting bankroll, in units
 goal: 10000          # target bankroll (shown on the site as progress in doublings: 100 -> 10,000 is ~6.6)
-min_edge: 0.03       # bet a side only when the model's win chance beats the book's no-vig chance by this much;
+market_weight: 0.5   # mix the model's chance halfway toward the book's no-vig chance (log-odds) before the edge test:
+                     # the market predicted better than the model over the first 198 priced games, so a 3-point
+                     # edge now needs about a 6-point gap between model and market
+min_edge: 0.03       # bet a side only when the mixed win chance beats the book's no-vig chance by this much;
                      # anything closer is a toss-up and gets no bet
 devig: multiplicative
 max_price_age_min: 30   # a prediction is bet only at a price read within this many minutes before it
 
-# Stake by edge: [edge at or above, units]. The flat strategy (1 unit on every bet) is kept alongside as a benchmark.
+# Stake by edge: [edge at or above, units]. Flat 1 unit for now: bigger edges did not win more often in the first
+# 96 bets, so bigger stakes on them only lost more. Bring tiers back once 300+ bets show we beat the closing line.
+# The flat strategy (1 unit on every bet) is kept alongside as a benchmark.
 stake_tiers:
   - [0.03, 1]
-  - [0.05, 2]
-  - [0.08, 3]
 flat_stake: 1
+
+# Rules in force before a date, so bets already placed keep the rules they were made under.
+earlier:
+  - until: "2026-11-27"   # first 96 bets: raw model edge, stake tiers 1/2/3 units at 3/5/8 points
+    market_weight: 0
+    stake_tiers: [[0.03, 1], [0.05, 2], [0.08, 3]]
 
 # Bet sizing as the bankroll grows. The tiers above are in units; one unit is worth unit_pct of the bankroll
 # at the start of the bet's day, rounded down to step, never below min_unit (so nothing changes until the
